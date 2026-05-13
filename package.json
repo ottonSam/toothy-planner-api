@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "prepare": "cd .. && husky toothy-planner-api/.husky",
+    "prepare": "husky",
     "format": "./mvnw spotless:apply",
     "quality": "./mvnw spotless:check spotbugs:check",
     "test": "./mvnw test",
