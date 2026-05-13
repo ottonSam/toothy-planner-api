@@ -1,0 +1,15 @@
+{
+  "name": "toothy-planner-api",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "prepare": "cd .. && husky toothy-planner-api/.husky",
+    "format": "./mvnw spotless:apply",
+    "quality": "./mvnw spotless:check spotbugs:check",
+    "test": "./mvnw test",
+    "precommit": "./mvnw spotless:apply && ./mvnw test && ./mvnw spotless:check && ./mvnw spotbugs:check"
+  },
+  "devDependencies": {
+    "husky": "9.1.7"
+  }
+}

@@ -1,0 +1,9 @@
+#!/usr/bin/env sh
+set -e
+
+cd "$(dirname "$0")/.."
+
+./mvnw spotless:apply
+./mvnw test
+./mvnw spotless:check
+./mvnw spotbugs:check

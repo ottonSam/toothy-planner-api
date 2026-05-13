@@ -1,0 +1,27 @@
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE}
+    container_name: ${POSTGRES_CONTAINER_NAME}
+    restart: unless-stopped
+    ports:
+      - "${POSTGRES_PORT}:${POSTGRES_CONTAINER_PORT}"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ${POSTGRES_DATA_PATH}:${POSTGRES_CONTAINER_DATA_PATH}
+
+  minio:
+    image: ${MINIO_IMAGE}
+    container_name: ${MINIO_CONTAINER_NAME}
+    restart: unless-stopped
+    command: server ${MINIO_CONTAINER_DATA_PATH} --console-address ":${MINIO_CONSOLE_CONTAINER_PORT}"
+    ports:
+      - "${MINIO_API_PORT}:${MINIO_API_CONTAINER_PORT}"
+      - "${MINIO_CONSOLE_PORT}:${MINIO_CONSOLE_CONTAINER_PORT}"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - ${MINIO_DATA_PATH}:${MINIO_CONTAINER_DATA_PATH}
