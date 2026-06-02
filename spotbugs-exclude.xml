@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2" />
+        <Or>
+            <Class name="~br\.com\.ottonsam\.toothy_planner_api\..*UseCase" />
+            <Class name="~br\.com\.ottonsam\.toothy_planner_api\..*Controller" />
+            <Class name="~br\.com\.ottonsam\.toothy_planner_api\..*Storage" />
+            <Class name="br.com.ottonsam.toothy_planner_api.auth.usecases.JwtTokenService" />
+        </Or>
+    </Match>
+    <Match>
+        <Class name="br.com.ottonsam.toothy_planner_api.config.SecurityConfig" />
+        <Bug pattern="THROWS_METHOD_THROWS_CLAUSE_BASIC_EXCEPTION" />
+    </Match>
+    <Match>
+        <Class name="br.com.ottonsam.toothy_planner_api.user.repositories.MinioProfileImageStorage" />
+        <Or>
+            <Bug pattern="REC_CATCH_EXCEPTION" />
+            <Bug pattern="THROWS_METHOD_THROWS_CLAUSE_BASIC_EXCEPTION" />
+        </Or>
+    </Match>
+</FindBugsFilter>

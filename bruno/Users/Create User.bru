@@ -1,0 +1,32 @@
+meta {
+  name: Create User
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/users
+  body: json
+}
+
+body:json {
+  {
+    "name": "John Doe",
+    "email": "john@example.com",
+    "password": "Strong1!",
+    "profileImage": null,
+    "theme": "LIGHT"
+  }
+}
+
+docs {
+  Expected response: 201 Created
+  {
+    "id": "uuid",
+    "name": "John Doe",
+    "email": "john@example.com",
+    "profileImage": "/api/v1/users/image",
+    "theme": "LIGHT",
+    "isActive": false
+  }
+}

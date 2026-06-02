@@ -1,0 +1,26 @@
+meta {
+  name: Update Profile Image
+  type: http
+  seq: 7
+}
+
+put {
+  url: {{baseUrl}}/api/v1/users/image
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "image": "BASE64_IMAGE"
+  }
+}
+
+docs {
+  Required cookie: access_token.
+  Use {"image": null} to remove the current profile image.
+  Expected response:
+  {
+    "message": "Profile image updated"
+  }
+}

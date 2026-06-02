@@ -1,0 +1,15 @@
+meta {
+  name: Get Profile Image
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/api/v1/users/image
+}
+
+docs {
+  Required cookie: access_token.
+  Expected response: image bytes for the authenticated user profile image.
+  If the user has no image, returns the default static image.
+}

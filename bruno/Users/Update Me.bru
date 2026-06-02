@@ -1,0 +1,31 @@
+meta {
+  name: Update Me
+  type: http
+  seq: 5
+}
+
+put {
+  url: {{baseUrl}}/api/v1/users/me
+  body: json
+}
+
+body:json {
+  {
+    "name": "John Updated",
+    "password": "NewStrong1!",
+    "theme": "DARK"
+  }
+}
+
+docs {
+  Required cookie: access_token.
+  Expected response:
+  {
+    "id": "uuid",
+    "name": "John Updated",
+    "email": "john@example.com",
+    "profileImage": "/api/v1/users/image",
+    "theme": "DARK",
+    "isActive": true
+  }
+}

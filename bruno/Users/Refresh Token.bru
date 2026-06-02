@@ -1,0 +1,17 @@
+meta {
+  name: Refresh Token
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/users/refresh
+}
+
+docs {
+  Required cookie: refresh_token.
+  Expected response: 200 OK with new access_token and refresh_token cookies.
+  {
+    "message": "Authenticated"
+  }
+}

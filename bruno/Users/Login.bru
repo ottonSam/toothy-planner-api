@@ -1,0 +1,30 @@
+meta {
+  name: Login
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/users/login
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "email": "john@example.com",
+    "password": "Strong1!"
+  }
+}
+
+docs {
+  Expected active user response: 200 OK with access_token and refresh_token cookies.
+  {
+    "message": "Authenticated"
+  }
+  
+  Expected inactive user response:
+  {
+    "message": "Account activation required. A new activation code was sent."
+  }
+}

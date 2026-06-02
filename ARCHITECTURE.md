@@ -3,6 +3,21 @@
 Este projeto organiza funcionalidades por modulo de negocio. Cada modulo deve
 ficar dentro do pacote base da aplicacao e deve explicitar suas camadas.
 
+## Estrutura raiz do projeto
+
+A raiz do projeto deve conter a pasta `specs/`, responsavel por centralizar as
+specs das funcionalidades.
+
+As specs devem ser numeradas sequencialmente, por exemplo:
+
+```text
+specs/001-nome-da-funcionalidade.md
+specs/002-outra-funcionalidade.md
+```
+
+Specs devem ser implementadas somente quando houver solicitacao explicita para
+implementar a spec.
+
 ## Estrutura obrigatoria por modulo
 
 Todo modulo deve seguir esta estrutura:

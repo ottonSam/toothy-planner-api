@@ -1,0 +1,22 @@
+meta {
+  name: Get Me
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/v1/users/me
+}
+
+docs {
+  Required cookie: access_token.
+  Expected response:
+  {
+    "id": "uuid",
+    "name": "John Doe",
+    "email": "john@example.com",
+    "profileImage": "/api/v1/users/image",
+    "theme": "LIGHT",
+    "isActive": true
+  }
+}

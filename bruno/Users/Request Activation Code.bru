@@ -1,0 +1,23 @@
+meta {
+  name: Request Activation Code
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/api/v1/users/activation-code
+  body: json
+}
+
+body:json {
+  {
+    "email": "john@example.com"
+  }
+}
+
+docs {
+  Expected response:
+  {
+    "message": "Activation code sent"
+  }
+}
