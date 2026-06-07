@@ -1,0 +1,29 @@
+meta {
+  name: Update Calendar
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/api/v1/calendars/{{calendarId}}
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "description": "Updated calendar plan",
+    "weeks": 8,
+    "starts": "2026-02-01",
+    "goalIds": []
+  }
+}
+
+vars:pre-request {
+  calendarId: bcbf6a7a-e178-43aa-82d8-67dd4f5afcf4
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  Expected response: 200 OK when the calendar belongs to the authenticated user.
+}

@@ -1,0 +1,15 @@
+meta {
+  name: Get Calendar
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/calendars/{{calendarId}}
+  body: none
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  Expected response: 200 OK when the calendar belongs to the authenticated user.
+}

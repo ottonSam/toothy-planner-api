@@ -1,0 +1,20 @@
+meta {
+  name: Delete Calendar
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/calendars/{{calendarId}}
+  body: none
+  auth: none
+}
+
+vars:pre-request {
+  calendarId: bcbf6a7a-e178-43aa-82d8-67dd4f5afcf4
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  Expected response: 204 No Content when the calendar belongs to the authenticated user.
+}

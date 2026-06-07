@@ -1,0 +1,15 @@
+meta {
+  name: List Goal Types
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/api/v1/goals/types
+  body: none
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  Expected response: 200 OK with label/value entries for LONG_TERM, MEDIUM_TERM and CALENDAR.
+}

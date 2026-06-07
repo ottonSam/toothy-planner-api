@@ -1,0 +1,28 @@
+meta {
+  name: Update Goal
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/api/v1/goals/{{goalId}}
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "name": "Updated roadmap",
+    "type": "MEDIUM_TERM",
+    "isComplete": true
+  }
+}
+
+vars:pre-request {
+  goalId: 86f7eacc-cc80-4824-b86b-f1661d49b91e
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  Expected response: 200 OK when the goal belongs to the authenticated user.
+}

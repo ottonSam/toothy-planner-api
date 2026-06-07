@@ -1,0 +1,33 @@
+meta {
+  name: Update Activity
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/api/v1/activities/{{activityId}}
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "calendarId": "{{calendarId}}",
+    "description": "Read pages",
+    "week": 1,
+    "type": "COUNT",
+    "goal": "30"
+  }
+}
+
+vars:pre-request {
+  activityId: 0c45d1e4-eecc-423e-9514-ec385be4c4aa
+  calendarId: 70356d1a-d81b-4251-992b-c2897db69652
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  Update does not change progress records.
+  Expected response: 200 OK when the activity belongs to the authenticated user.
+}
+​

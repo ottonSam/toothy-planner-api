@@ -1,0 +1,28 @@
+meta {
+  name: Register Count Progress
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{baseUrl}}/api/v1/activities/progress/count
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "activityId": "{{activityId}}",
+    "value": 5
+  }
+}
+
+vars:pre-request {
+  activityId: 0c45d1e4-eecc-423e-9514-ec385be4c4aa
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  value must be positive and is added to COUNT progress.
+  Expected response: 200 OK with recalculated progress.
+}

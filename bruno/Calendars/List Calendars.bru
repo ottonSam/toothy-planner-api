@@ -1,0 +1,15 @@
+meta {
+  name: List Calendars
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/calendars
+  body: none
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  Expected response: 200 OK with only calendars owned by the authenticated user.
+}

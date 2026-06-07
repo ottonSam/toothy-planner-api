@@ -1,0 +1,31 @@
+meta {
+  name: Create Activity
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/activities
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "calendarId": "{{calendarId}}",
+    "description": "Study sessions",
+    "week": 1,
+    "type": "DAYS",
+    "goal": "3"
+  }
+}
+
+vars:pre-request {
+  calendarId: 70356d1a-d81b-4251-992b-c2897db69652
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  For TIME activities, goal must be text like 3h 20m, 2m 4h, 45m or 2h.
+  Expected response: 201 Created with goal converted to minutes and progress as 0.
+}

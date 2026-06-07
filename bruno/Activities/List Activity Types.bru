@@ -1,0 +1,15 @@
+meta {
+  name: List Activity Types
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/api/v1/activities/types
+  body: none
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  Expected response: 200 OK with DAYS, COUNT and TIME label/value entries.
+}

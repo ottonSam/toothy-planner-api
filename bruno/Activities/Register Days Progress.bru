@@ -1,0 +1,28 @@
+meta {
+  name: Register Days Progress
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/api/v1/activities/progress/days
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "activityId": "{{activityId}}",
+    "day": "MONDAY"
+  }
+}
+
+vars:pre-request {
+  activityId: 0c45d1e4-eecc-423e-9514-ec385be4c4aa
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  The same day can be registered only once for the same activity.
+  Expected response: 200 OK with recalculated progress.
+}

@@ -1,0 +1,24 @@
+meta {
+  name: Create Goal
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/goals
+  body: json
+}
+
+body:json {
+  {
+    "name": "Build long term roadmap",
+    "type": "LONG_TERM",
+    "isComplete": false
+  }
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  Expected response: 201 Created.
+}
+​

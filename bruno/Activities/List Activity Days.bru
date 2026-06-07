@@ -1,0 +1,15 @@
+meta {
+  name: List Activity Days
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/api/v1/activities/days
+  body: none
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  Expected response: 200 OK with week day label/value entries.
+}

@@ -1,0 +1,33 @@
+meta {
+  name: Create Calendar
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/calendars
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "description": "First quarter plan",
+    "weeks": 12,
+    "starts": "2026-01-01",
+    "goalIds": [
+      "{{goalId}}"
+    ]
+  }
+}
+
+vars:pre-request {
+  goalId: 9912c287-c621-4666-b926-926d95dc5874
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  goalIds is optional, but every provided goal must belong to the authenticated user.
+  Expected response: 201 Created.
+}
+​

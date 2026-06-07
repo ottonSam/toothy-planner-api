@@ -1,0 +1,28 @@
+meta {
+  name: Register Time Progress
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{baseUrl}}/api/v1/activities/progress/time
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "activityId": "{{activityId}}",
+    "time": "2m 4h"
+  }
+}
+
+vars:pre-request {
+  activityId: 0c45d1e4-eecc-423e-9514-ec385be4c4aa
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  time is converted to minutes and added to TIME progress.
+  Expected response: 200 OK with recalculated progress.
+}
