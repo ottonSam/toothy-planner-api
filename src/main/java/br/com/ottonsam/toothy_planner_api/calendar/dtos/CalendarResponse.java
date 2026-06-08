@@ -1,12 +1,20 @@
 package br.com.ottonsam.toothy_planner_api.calendar.dtos;
 
+import br.com.ottonsam.toothy_planner_api.activity.entities.WeekDay;
 import br.com.ottonsam.toothy_planner_api.calendar.entities.CalendarEntity;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
-public record CalendarResponse(UUID id, String description, int weeks, LocalDate starts, List<UUID> goalIds) {
+public record CalendarResponse(
+        UUID id,
+        String description,
+        int weeks,
+        LocalDate starts,
+        WeekDay weekStartsOn,
+        WeekDay weekEndsOn,
+        List<UUID> goalIds) {
 
     public CalendarResponse {
         goalIds = List.copyOf(goalIds);
@@ -23,6 +31,12 @@ public record CalendarResponse(UUID id, String description, int weeks, LocalDate
                 .sorted(Comparator.naturalOrder())
                 .toList();
         return new CalendarResponse(
-                calendar.getId(), calendar.getDescription(), calendar.getWeeks(), calendar.getStarts(), goalIds);
+                calendar.getId(),
+                calendar.getDescription(),
+                calendar.getWeeks(),
+                calendar.getStarts(),
+                calendar.getWeekStartsOn(),
+                calendar.getWeekEndsOn(),
+                goalIds);
     }
 }

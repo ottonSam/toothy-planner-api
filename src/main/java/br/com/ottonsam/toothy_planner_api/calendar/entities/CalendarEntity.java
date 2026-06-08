@@ -1,10 +1,13 @@
 package br.com.ottonsam.toothy_planner_api.calendar.entities;
 
+import br.com.ottonsam.toothy_planner_api.activity.entities.WeekDay;
 import br.com.ottonsam.toothy_planner_api.config.ApiException;
 import br.com.ottonsam.toothy_planner_api.goal.entities.GoalEntity;
 import br.com.ottonsam.toothy_planner_api.user.entities.UserEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
@@ -46,6 +49,14 @@ public class CalendarEntity {
     @Column(nullable = false)
     @NotNull(message = "Calendar start date is required") private LocalDate starts;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "week_starts_on", nullable = false)
+    @NotNull(message = "Calendar week start day is required") private WeekDay weekStartsOn;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "week_ends_on", nullable = false)
+    @NotNull(message = "Calendar week end day is required") private WeekDay weekEndsOn;
+
     @ManyToMany
     @JoinTable(
             name = "calendar_goals",
@@ -69,6 +80,7 @@ public class CalendarEntity {
         this.description = description.trim();
         this.weeks = weeks;
         this.starts = starts;
+        updateWeekBoundaries(starts);
         this.goals = new HashSet<>(goals);
         this.user = user;
         this.createdAt = OffsetDateTime.now();
@@ -92,6 +104,7 @@ public class CalendarEntity {
         this.description = description.trim();
         this.weeks = weeks;
         this.starts = starts;
+        updateWeekBoundaries(starts);
         this.goals = new HashSet<>(goals == null ? Set.of() : goals);
         this.updatedAt = OffsetDateTime.now();
     }
@@ -122,5 +135,10 @@ public class CalendarEntity {
         if (user == null) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Calendar user is required");
         }
+    }
+
+    private void updateWeekBoundaries(LocalDate starts) {
+        this.weekStartsOn = WeekDay.valueOf(starts.getDayOfWeek().name());
+        this.weekEndsOn = WeekDay.valueOf(starts.minusDays(1).getDayOfWeek().name());
     }
 }

@@ -10,5 +10,7 @@ public interface ActivityRepository extends JpaRepository<ActivityEntity, UUID> 
 
     List<ActivityEntity> findAllByCalendarUserIdOrderByCreatedAtAsc(UUID userId);
 
+    List<ActivityEntity> findAllByCalendarIdAndWeekOrderByCreatedAtAsc(UUID calendarId, int week);
+
     Optional<ActivityEntity> findByIdAndCalendarUserId(UUID id, UUID userId);
 }

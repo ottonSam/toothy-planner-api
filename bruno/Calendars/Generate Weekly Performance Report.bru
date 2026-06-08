@@ -1,0 +1,28 @@
+meta {
+  name: Generate Weekly Performance Report
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/api/v1/calendars/{{calendarId}}/weeks/{{week}}/reports
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "userFeedback": "Foi uma semana produtiva, mas concentrei parte das entregas no fim."
+  }
+}
+
+vars:pre-request {
+  calendarId: 70356d1a-d81b-4251-992b-c2897db69652
+  week: 1
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  The report can only be generated on or after the selected week end date.
+  Expected response: 201 Created with metrics JSON and markdownReport.
+}

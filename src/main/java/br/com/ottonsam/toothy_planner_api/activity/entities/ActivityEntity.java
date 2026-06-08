@@ -15,6 +15,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 import lombok.AccessLevel;
@@ -48,6 +49,12 @@ public class ActivityEntity {
     @Column(nullable = false)
     @Min(value = 1, message = "Activity goal must be positive") private int goal;
 
+    @Column(name = "week_starts_at", nullable = false)
+    @NotNull(message = "Activity week start date is required") private LocalDate weekStartsAt;
+
+    @Column(name = "week_ends_at", nullable = false)
+    @NotNull(message = "Activity week end date is required") private LocalDate weekEndsAt;
+
     @Column(name = "created_at", nullable = false)
     @NotNull(message = "Created at is required") private OffsetDateTime createdAt;
 
@@ -62,6 +69,7 @@ public class ActivityEntity {
         this.calendar = calendar;
         this.type = type;
         this.goal = goal;
+        updateWeekRange(calendar, week);
         this.createdAt = OffsetDateTime.now();
         this.updatedAt = createdAt;
     }
@@ -87,6 +95,7 @@ public class ActivityEntity {
         this.calendar = calendar;
         this.type = type;
         this.goal = goal;
+        updateWeekRange(calendar, week);
         this.updatedAt = OffsetDateTime.now();
     }
 
@@ -122,5 +131,10 @@ public class ActivityEntity {
         if (calendar == null) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Activity calendar is required");
         }
+    }
+
+    private void updateWeekRange(CalendarEntity calendar, int week) {
+        this.weekStartsAt = calendar.getStarts().plusDays((long) (week - 1) * 7);
+        this.weekEndsAt = weekStartsAt.plusDays(6);
     }
 }

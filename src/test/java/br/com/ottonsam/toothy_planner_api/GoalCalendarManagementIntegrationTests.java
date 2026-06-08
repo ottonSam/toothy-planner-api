@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import br.com.ottonsam.toothy_planner_api.report.usecases.WeeklyReportAiClient;
 import br.com.ottonsam.toothy_planner_api.user.repositories.ProfileImageStorage;
 import br.com.ottonsam.toothy_planner_api.user.repositories.UserActivationCodeRepository;
 import br.com.ottonsam.toothy_planner_api.user.repositories.UserRepository;
@@ -16,6 +17,9 @@ import br.com.ottonsam.toothy_planner_api.user.usecases.ProfileImagePayload;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.Cookie;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -98,6 +102,8 @@ class GoalCalendarManagementIntegrationTests {
         mockMvc.perform(get("/api/v1/calendars/{id}", calendarId).cookie(userCookie))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.description").value("First quarter"))
+                .andExpect(jsonPath("$.weekStartsOn").value("THURSDAY"))
+                .andExpect(jsonPath("$.weekEndsOn").value("WEDNESDAY"))
                 .andExpect(jsonPath("$.goalIds[0]").value(userGoalId.toString()));
 
         mockMvc.perform(post("/api/v1/calendars")
@@ -133,6 +139,8 @@ class GoalCalendarManagementIntegrationTests {
                                 java.util.List.of()))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.weeks").value(8))
+                .andExpect(jsonPath("$.weekStartsOn").value("SUNDAY"))
+                .andExpect(jsonPath("$.weekEndsOn").value("SATURDAY"))
                 .andExpect(jsonPath("$.goalIds").isEmpty());
     }
 
@@ -157,6 +165,8 @@ class GoalCalendarManagementIntegrationTests {
         mockMvc.perform(get("/api/v1/activities/{id}", activityId).cookie(userCookie))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.goal").value(200))
+                .andExpect(jsonPath("$.weekStartsAt").value("2026-01-08"))
+                .andExpect(jsonPath("$.weekEndsAt").value("2026-01-14"))
                 .andExpect(jsonPath("$.progress").value(0));
 
         mockMvc.perform(get("/api/v1/activities/{id}", activityId).cookie(otherCookie))
@@ -197,6 +207,8 @@ class GoalCalendarManagementIntegrationTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.type").value("COUNT"))
                 .andExpect(jsonPath("$.goal").value(30))
+                .andExpect(jsonPath("$.weekStartsAt").value("2026-01-01"))
+                .andExpect(jsonPath("$.weekEndsAt").value("2026-01-07"))
                 .andExpect(jsonPath("$.progress").value(0));
     }
 
@@ -245,6 +257,90 @@ class GoalCalendarManagementIntegrationTests {
                 .andExpect(jsonPath("$.progress").value(242));
     }
 
+    @Test
+    void generatesWeeklyPerformanceReportAndStoresMetrics() throws Exception {
+        var userCookie = login("report-user@example.com");
+        var calendarId = createCalendar(userCookie, "Report calendar", 4);
+        var daysActivityId = createActivity(userCookie, calendarId, "Train", 1, "DAYS", "1");
+        var countActivityId = createActivity(userCookie, calendarId, "Pages", 1, "COUNT", "10");
+        var timeActivityId = createActivity(userCookie, calendarId, "Study", 1, "TIME", "1h");
+
+        mockMvc.perform(post("/api/v1/activities/progress/days")
+                        .cookie(userCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("activityId", daysActivityId, "day", "MONDAY"))))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/activities/progress/count")
+                        .cookie(userCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("activityId", countActivityId, "value", 15))))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/activities/progress/time")
+                        .cookie(userCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("activityId", timeActivityId, "time", "2h"))))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/calendars/{calendarId}/weeks/{week}/reports", calendarId, 1)
+                        .cookie(userCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("userFeedback", "Foi uma semana produtiva, mas concentrei tudo no fim."))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.calendarId").value(calendarId.toString()))
+                .andExpect(jsonPath("$.week").value(1))
+                .andExpect(jsonPath("$.weekStartsAt").value("2026-01-01"))
+                .andExpect(jsonPath("$.weekEndsAt").value("2026-01-07"))
+                .andExpect(jsonPath("$.metrics.expectedTotal").value(71))
+                .andExpect(jsonPath("$.metrics.deliveredTotal").value(136))
+                .andExpect(jsonPath("$.metrics.deliveryPercentage").value(100.0))
+                .andExpect(jsonPath("$.metrics.activities[1].delivered").value(15))
+                .andExpect(
+                        jsonPath("$.metrics.activities[1].deliveryPercentage").value(100.0))
+                .andExpect(jsonPath("$.metrics.activities[2].delivered").value(120))
+                .andExpect(
+                        jsonPath("$.metrics.activities[2].deliveryPercentage").value(100.0))
+                .andExpect(jsonPath("$.markdownReport")
+                        .value("# Relatorio Semanal de Desempenho\n\n## Resumo\nRelatorio gerado."));
+
+        mockMvc.perform(post("/api/v1/calendars/{calendarId}/weeks/{week}/reports", calendarId, 1)
+                        .cookie(userCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("userFeedback", "Tentativa duplicada."))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Weekly performance report already exists for this week"));
+
+        mockMvc.perform(get("/api/v1/calendars/{calendarId}/weeks/{week}/reports", calendarId, 1)
+                        .cookie(userCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.week").value(1));
+
+        mockMvc.perform(get("/api/v1/calendars/{calendarId}/reports", calendarId)
+                        .cookie(userCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].week").value(1));
+    }
+
+    @Test
+    void blocksWeeklyPerformanceReportBeforeWeekEndAndWithoutFeedback() throws Exception {
+        var userCookie = login("report-blocked@example.com");
+        var calendarId = createCalendar(userCookie, "Future report calendar", 4, "2026-01-02");
+
+        mockMvc.perform(post("/api/v1/calendars/{calendarId}/weeks/{week}/reports", calendarId, 1)
+                        .cookie(userCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("userFeedback", "Ainda nao terminou."))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message")
+                        .value("Weekly performance report can only be generated on or after the week end date"));
+
+        mockMvc.perform(post("/api/v1/calendars/{calendarId}/weeks/{week}/reports", calendarId, 1)
+                        .cookie(userCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("userFeedback", ""))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("User feedback is required"));
+    }
+
     private UUID createGoal(Cookie accessToken, String name, String type) throws Exception {
         var response = mockMvc.perform(post("/api/v1/goals")
                         .cookie(accessToken)
@@ -257,6 +353,11 @@ class GoalCalendarManagementIntegrationTests {
     }
 
     private UUID createCalendar(Cookie accessToken, String description, int weeks, UUID... goalIds) throws Exception {
+        return createCalendar(accessToken, description, weeks, "2026-01-01", goalIds);
+    }
+
+    private UUID createCalendar(Cookie accessToken, String description, int weeks, String starts, UUID... goalIds)
+            throws Exception {
         var response = mockMvc.perform(post("/api/v1/calendars")
                         .cookie(accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -266,7 +367,7 @@ class GoalCalendarManagementIntegrationTests {
                                 "weeks",
                                 weeks,
                                 "starts",
-                                "2026-01-01",
+                                starts,
                                 "goalIds",
                                 java.util.Arrays.asList(goalIds)))))
                 .andExpect(status().isCreated())
@@ -334,6 +435,18 @@ class GoalCalendarManagementIntegrationTests {
 
     @TestConfiguration
     static class TestStorageConfiguration {
+
+        @Bean
+        @Primary
+        Clock fixedClock() {
+            return Clock.fixed(Instant.parse("2026-01-07T12:00:00Z"), ZoneOffset.UTC);
+        }
+
+        @Bean
+        @Primary
+        WeeklyReportAiClient weeklyReportAiClient() {
+            return prompt -> "# Relatorio Semanal de Desempenho\n\n## Resumo\nRelatorio gerado.";
+        }
 
         @Bean
         @Primary

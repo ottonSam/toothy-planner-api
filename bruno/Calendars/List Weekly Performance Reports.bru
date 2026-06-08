@@ -1,0 +1,20 @@
+meta {
+  name: List Weekly Performance Reports
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/api/v1/calendars/{{calendarId}}/reports
+  body: none
+  auth: none
+}
+
+vars:pre-request {
+  calendarId: 70356d1a-d81b-4251-992b-c2897db69652
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  Expected response: 200 OK with reports ordered by week ascending.
+}
