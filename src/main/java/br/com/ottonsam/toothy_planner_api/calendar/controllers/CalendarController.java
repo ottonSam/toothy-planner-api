@@ -1,5 +1,7 @@
 package br.com.ottonsam.toothy_planner_api.calendar.controllers;
 
+import br.com.ottonsam.toothy_planner_api.activity.dtos.ActivityResponse;
+import br.com.ottonsam.toothy_planner_api.activity.usecases.ActivityUseCase;
 import br.com.ottonsam.toothy_planner_api.calendar.dtos.CalendarRequest;
 import br.com.ottonsam.toothy_planner_api.calendar.dtos.CalendarResponse;
 import br.com.ottonsam.toothy_planner_api.calendar.usecases.CalendarUseCase;
@@ -21,9 +23,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class CalendarController {
 
     private final CalendarUseCase calendarUseCase;
+    private final ActivityUseCase activityUseCase;
 
-    public CalendarController(CalendarUseCase calendarUseCase) {
+    public CalendarController(CalendarUseCase calendarUseCase, ActivityUseCase activityUseCase) {
         this.calendarUseCase = calendarUseCase;
+        this.activityUseCase = activityUseCase;
     }
 
     @PostMapping
@@ -50,5 +54,10 @@ public class CalendarController {
     ResponseEntity<Void> delete(@PathVariable UUID id) {
         calendarUseCase.delete(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{calendarId}/weeks/{week}/activities")
+    List<ActivityResponse> listActivitiesByWeek(@PathVariable UUID calendarId, @PathVariable int week) {
+        return activityUseCase.listByCalendarAndWeek(calendarId, week);
     }
 }

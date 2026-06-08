@@ -54,6 +54,15 @@ public class ActivityUseCase {
                 .toList();
     }
 
+    public List<ActivityResponse> listByCalendarAndWeek(UUID calendarId, int week) {
+        var user = currentUserProvider.get();
+        var calendar = findOwnedCalendar(calendarId, user.getId());
+        ActivityEntity.validateWeek(week, calendar.getWeeks());
+        return activityRepository.findAllByCalendarIdAndWeekOrderByCreatedAtAsc(calendar.getId(), week).stream()
+                .map(activityProgressReader::toResponse)
+                .toList();
+    }
+
     public ActivityResponse get(UUID id) {
         var user = currentUserProvider.get();
         return activityProgressReader.toResponse(findOwned(id, user.getId()));

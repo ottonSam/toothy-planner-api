@@ -169,6 +169,32 @@ class GoalCalendarManagementIntegrationTests {
                 .andExpect(jsonPath("$.weekEndsAt").value("2026-01-14"))
                 .andExpect(jsonPath("$.progress").value(0));
 
+        mockMvc.perform(get("/api/v1/calendars/{calendarId}/weeks/{week}/activities", calendarId, 1)
+                        .cookie(userCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isEmpty());
+
+        mockMvc.perform(get("/api/v1/calendars/{calendarId}/weeks/{week}/activities", calendarId, 2)
+                        .cookie(userCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(activityId.toString()))
+                .andExpect(jsonPath("$[0].week").value(2));
+
+        mockMvc.perform(get("/api/v1/calendars/{calendarId}/weeks/{week}/activities", calendarId, 2)
+                        .cookie(otherCookie))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Calendar not found"));
+
+        mockMvc.perform(get("/api/v1/calendars/{calendarId}/weeks/{week}/activities", calendarId, 0)
+                        .cookie(userCookie))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Activity week must be greater than 0"));
+
+        mockMvc.perform(get("/api/v1/calendars/{calendarId}/weeks/{week}/activities", calendarId, 3)
+                        .cookie(userCookie))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Activity week must be less than or equal to calendar weeks"));
+
         mockMvc.perform(get("/api/v1/activities/{id}", activityId).cookie(otherCookie))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message").value("Activity not found"));
