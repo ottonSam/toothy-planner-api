@@ -18,6 +18,13 @@ public class AuthCookieFactory {
                         .toString());
     }
 
+    public void clearAuthCookies(HttpServletResponse response) {
+        response.addHeader(
+                HttpHeaders.SET_COOKIE, createCookie("access_token", "", 0).toString());
+        response.addHeader(
+                HttpHeaders.SET_COOKIE, createCookie("refresh_token", "", 0).toString());
+    }
+
     private ResponseCookie createCookie(String name, String value, long maxAgeSeconds) {
         return ResponseCookie.from(name, value)
                 .httpOnly(true)

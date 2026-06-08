@@ -85,6 +85,12 @@ public class UserController {
         return ResponseEntity.ok(new MessageResponse(result.message()));
     }
 
+    @PostMapping("/logout")
+    ResponseEntity<MessageResponse> logout(HttpServletResponse response) {
+        authCookieFactory.clearAuthCookies(response);
+        return ResponseEntity.ok(new MessageResponse("Logout successful"));
+    }
+
     @GetMapping("/refresh")
     ResponseEntity<MessageResponse> refresh(
             @CookieValue(name = "refresh_token", required = false) String refreshToken, HttpServletResponse response) {

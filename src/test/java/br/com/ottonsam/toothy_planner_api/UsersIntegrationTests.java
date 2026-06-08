@@ -176,6 +176,19 @@ class UsersIntegrationTests {
     }
 
     @Test
+    void logoutClearsAuthenticationCookies() throws Exception {
+        var cookies = login("logout@example.com");
+
+        mockMvc.perform(post("/api/v1/users/logout").cookie(cookies.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Logout successful"))
+                .andExpect(cookie().value("access_token", ""))
+                .andExpect(cookie().maxAge("access_token", 0))
+                .andExpect(cookie().value("refresh_token", ""))
+                .andExpect(cookie().maxAge("refresh_token", 0));
+    }
+
+    @Test
     void updatesCurrentUserAndProfileImage() throws Exception {
         var cookies = login("update@example.com");
 
