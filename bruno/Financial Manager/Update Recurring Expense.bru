@@ -1,0 +1,30 @@
+meta {
+  name: Update Recurring Expense
+  type: http
+  seq: 29
+}
+
+put {
+  url: {{baseUrl}}/api/v1/financial-manager/wallets/{{walletId}}/recurring-expenses/{{recurringExpenseId}}
+  body: json
+}
+
+body:json {
+  {
+    "categoryId": "00000000-0000-0000-0000-000000000000",
+    "description": "Internet atualizada",
+    "amount": 109.90,
+    "startsAt": "2026-07-13"
+  }
+}
+
+vars:pre-request {
+  walletId: 00000000-0000-0000-0000-000000000000
+  recurringExpenseId: 00000000-0000-0000-0000-000000000000
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  Updates future generated recurring expenses whose cycles are not closed.
+}
+

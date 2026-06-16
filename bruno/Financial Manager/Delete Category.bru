@@ -1,0 +1,19 @@
+meta {
+  name: Delete Category
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/financial-manager/categories/{{categoryId}}
+}
+
+vars:pre-request {
+  categoryId: 00000000-0000-0000-0000-000000000000
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  Expected response: 204 No Content when category is unused.
+}
+

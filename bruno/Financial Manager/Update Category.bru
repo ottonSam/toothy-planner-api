@@ -1,0 +1,28 @@
+meta {
+  name: Update Category
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/api/v1/financial-manager/categories/{{categoryId}}
+  body: json
+}
+
+body:json {
+  {
+    "name": "Mercado",
+    "color": "#22C55E",
+    "icon": "shopping-cart"
+  }
+}
+
+vars:pre-request {
+  categoryId: 00000000-0000-0000-0000-000000000000
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  Expected response: 200 OK.
+}
+

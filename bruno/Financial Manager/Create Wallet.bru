@@ -1,0 +1,24 @@
+meta {
+  name: Create Wallet
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/api/v1/financial-manager/wallets
+  body: json
+}
+
+body:json {
+  {
+    "description": "Carteira pessoal",
+    "spendingGoal": 3000.00,
+    "cycleEndDay": 15
+  }
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  Expected response: 201 Created.
+}
+

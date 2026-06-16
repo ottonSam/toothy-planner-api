@@ -1,0 +1,31 @@
+meta {
+  name: Create Installment Expense By Total
+  type: http
+  seq: 20
+}
+
+post {
+  url: {{baseUrl}}/api/v1/financial-manager/wallets/{{walletId}}/installment-expenses
+  body: json
+}
+
+body:json {
+  {
+    "categoryId": "00000000-0000-0000-0000-000000000000",
+    "description": "Notebook",
+    "totalAmount": 3500.00,
+    "installments": 10,
+    "firstExpenseDate": "2026-07-16"
+  }
+}
+
+vars:pre-request {
+  walletId: 00000000-0000-0000-0000-000000000000
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  Creates installment expenses in all corresponding cycles.
+  Expected response: 201 Created.
+}
+

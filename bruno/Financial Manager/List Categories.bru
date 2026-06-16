@@ -1,0 +1,15 @@
+meta {
+  name: List Categories
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/financial-manager/categories
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  Expected response: 200 OK.
+}
+

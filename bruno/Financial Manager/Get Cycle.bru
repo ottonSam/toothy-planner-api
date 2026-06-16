@@ -1,0 +1,20 @@
+meta {
+  name: Get Cycle
+  type: http
+  seq: 13
+}
+
+get {
+  url: {{baseUrl}}/api/v1/financial-manager/wallets/{{walletId}}/cycles/{{cycleId}}
+}
+
+vars:pre-request {
+  walletId: 00000000-0000-0000-0000-000000000000
+  cycleId: 00000000-0000-0000-0000-000000000000
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  Expected response: 200 OK.
+}
+

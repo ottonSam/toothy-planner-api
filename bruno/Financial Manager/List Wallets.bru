@@ -1,0 +1,15 @@
+meta {
+  name: List Wallets
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/api/v1/financial-manager/wallets
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  Expected response: 200 OK.
+}
+

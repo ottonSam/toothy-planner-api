@@ -1,0 +1,28 @@
+meta {
+  name: Update Wallet
+  type: http
+  seq: 9
+}
+
+put {
+  url: {{baseUrl}}/api/v1/financial-manager/wallets/{{walletId}}
+  body: json
+}
+
+body:json {
+  {
+    "description": "Carteira principal",
+    "spendingGoal": 3500.00,
+    "cycleEndDay": 15
+  }
+}
+
+vars:pre-request {
+  walletId: 00000000-0000-0000-0000-000000000000
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  Expected response: 200 OK.
+}
+

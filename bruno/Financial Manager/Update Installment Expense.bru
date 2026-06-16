@@ -1,0 +1,31 @@
+meta {
+  name: Update Installment Expense
+  type: http
+  seq: 24
+}
+
+put {
+  url: {{baseUrl}}/api/v1/financial-manager/wallets/{{walletId}}/installment-expenses/{{installmentExpenseId}}
+  body: json
+}
+
+body:json {
+  {
+    "categoryId": "00000000-0000-0000-0000-000000000000",
+    "description": "Notebook atualizado",
+    "totalAmount": 3600.00,
+    "installments": 10,
+    "firstExpenseDate": "2026-07-16"
+  }
+}
+
+vars:pre-request {
+  walletId: 00000000-0000-0000-0000-000000000000
+  installmentExpenseId: 00000000-0000-0000-0000-000000000000
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  Updates future installments whose cycles are not closed.
+}
+

@@ -1,0 +1,30 @@
+meta {
+  name: Create Installment Expense By Installment
+  type: http
+  seq: 21
+}
+
+post {
+  url: {{baseUrl}}/api/v1/financial-manager/wallets/{{walletId}}/installment-expenses
+  body: json
+}
+
+body:json {
+  {
+    "categoryId": "00000000-0000-0000-0000-000000000000",
+    "description": "Academia",
+    "installmentAmount": 120.00,
+    "installments": 12,
+    "firstExpenseDate": "2026-07-13"
+  }
+}
+
+vars:pre-request {
+  walletId: 00000000-0000-0000-0000-000000000000
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  Expected response: 201 Created.
+}
+

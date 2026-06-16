@@ -1,12 +1,19 @@
 package br.com.ottonsam.toothy_planner_api.auth.usecases;
 
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Component;
 
 @Component
 public class AuthCookieFactory {
+
+    private final boolean cookieSecure;
+
+    public AuthCookieFactory(@Value("${app.auth.cookie-secure:false}") boolean cookieSecure) {
+        this.cookieSecure = cookieSecure;
+    }
 
     public void addAuthCookies(HttpServletResponse response, AuthTokens tokens) {
         response.addHeader(
@@ -28,7 +35,7 @@ public class AuthCookieFactory {
     private ResponseCookie createCookie(String name, String value, long maxAgeSeconds) {
         return ResponseCookie.from(name, value)
                 .httpOnly(true)
-                .secure(true)
+                .secure(cookieSecure)
                 .sameSite("Lax")
                 .path("/")
                 .maxAge(maxAgeSeconds)

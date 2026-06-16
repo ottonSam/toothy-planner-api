@@ -1,0 +1,20 @@
+meta {
+  name: Get Installment Expense
+  type: http
+  seq: 23
+}
+
+get {
+  url: {{baseUrl}}/api/v1/financial-manager/wallets/{{walletId}}/installment-expenses/{{installmentExpenseId}}
+}
+
+vars:pre-request {
+  walletId: 00000000-0000-0000-0000-000000000000
+  installmentExpenseId: 00000000-0000-0000-0000-000000000000
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  Expected response: 200 OK.
+}
+

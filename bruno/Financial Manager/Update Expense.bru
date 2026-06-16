@@ -1,0 +1,30 @@
+meta {
+  name: Update Expense
+  type: http
+  seq: 18
+}
+
+put {
+  url: {{baseUrl}}/api/v1/financial-manager/wallets/{{walletId}}/expenses/{{expenseId}}
+  body: json
+}
+
+body:json {
+  {
+    "categoryId": "00000000-0000-0000-0000-000000000000",
+    "description": "Mercado atualizado",
+    "amount": 275.00,
+    "expenseDate": "2026-07-16"
+  }
+}
+
+vars:pre-request {
+  walletId: 00000000-0000-0000-0000-000000000000
+  expenseId: 00000000-0000-0000-0000-000000000000
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  Expected response: 200 OK.
+}
+

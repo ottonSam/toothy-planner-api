@@ -1,0 +1,27 @@
+meta {
+  name: Cancel Recurring Expense
+  type: http
+  seq: 30
+}
+
+post {
+  url: {{baseUrl}}/api/v1/financial-manager/wallets/{{walletId}}/recurring-expenses/{{recurringExpenseId}}/cancel
+  body: json
+}
+
+body:json {
+  {
+    "cycleId": "00000000-0000-0000-0000-000000000000"
+  }
+}
+
+vars:pre-request {
+  walletId: 00000000-0000-0000-0000-000000000000
+  recurringExpenseId: 00000000-0000-0000-0000-000000000000
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  Cancels the recurrence and removes generated expenses from following cycles.
+}
+

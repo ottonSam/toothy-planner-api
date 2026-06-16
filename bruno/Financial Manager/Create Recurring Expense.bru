@@ -1,0 +1,29 @@
+meta {
+  name: Create Recurring Expense
+  type: http
+  seq: 26
+}
+
+post {
+  url: {{baseUrl}}/api/v1/financial-manager/wallets/{{walletId}}/recurring-expenses
+  body: json
+}
+
+body:json {
+  {
+    "categoryId": "00000000-0000-0000-0000-000000000000",
+    "description": "Internet",
+    "amount": 99.90,
+    "startsAt": "2026-07-13"
+  }
+}
+
+vars:pre-request {
+  walletId: 00000000-0000-0000-0000-000000000000
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  Generates a recurring expense in the start cycle and future cycles created later.
+}
+
