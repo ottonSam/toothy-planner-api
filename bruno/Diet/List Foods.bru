@@ -1,0 +1,19 @@
+meta {
+  name: List Foods
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/v1/diet/foods?name={{foodName}}
+}
+
+vars:pre-request {
+  foodName: ovo
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  Used by frontend autocomplete/autoselect.
+}
+

@@ -1,0 +1,25 @@
+meta {
+  name: Update Default Goal
+  type: http
+  seq: 2
+}
+
+put {
+  url: {{baseUrl}}/api/v1/diet/goals/default
+  body: json
+}
+
+body:json {
+  {
+    "kcal": 2200.00,
+    "protein": 160.00,
+    "carbohydrate": 250.00,
+    "fat": 70.00
+  }
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  Updates the default goal and daily goals from today onward.
+}
+

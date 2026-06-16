@@ -1,0 +1,19 @@
+meta {
+  name: Get Food
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/api/v1/diet/foods/{{foodId}}
+}
+
+vars:pre-request {
+  foodId: 00000000-0000-0000-0000-000000000000
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  Expected response: 200 OK.
+}
+

@@ -1,0 +1,19 @@
+meta {
+  name: Get Daily Metrics
+  type: http
+  seq: 12
+}
+
+get {
+  url: {{baseUrl}}/api/v1/diet/metrics?date={{date}}
+}
+
+vars:pre-request {
+  date: 2026-07-13
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  Expected response: 200 OK with goal, consumed, remaining and entries.
+}
+

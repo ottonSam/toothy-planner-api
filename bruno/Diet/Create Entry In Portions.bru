@@ -1,0 +1,25 @@
+meta {
+  name: Create Entry In Portions
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/api/v1/diet/entries
+  body: json
+}
+
+body:json {
+  {
+    "foodName": "pao frances",
+    "quantity": 2.00,
+    "unit": "PORTIONS",
+    "entryDate": "2026-07-13"
+  }
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  Expected response: 201 Created.
+}
+

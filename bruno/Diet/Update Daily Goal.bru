@@ -1,0 +1,29 @@
+meta {
+  name: Update Daily Goal
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/api/v1/diet/goals/daily?date={{date}}
+  body: json
+}
+
+body:json {
+  {
+    "kcal": 1800.00,
+    "protein": 150.00,
+    "carbohydrate": 180.00,
+    "fat": 60.00
+  }
+}
+
+vars:pre-request {
+  date: 2026-07-13
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  Updates only the selected day.
+}
+

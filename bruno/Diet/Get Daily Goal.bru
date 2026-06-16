@@ -1,0 +1,19 @@
+meta {
+  name: Get Daily Goal
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/diet/goals/daily?date={{date}}
+}
+
+vars:pre-request {
+  date: 2026-07-13
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  Expected response: 200 OK.
+}
+
