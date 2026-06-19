@@ -135,6 +135,11 @@ public class FinancialManagerController {
         return metricsUseCase.getCycleMetrics(walletId, cycleId);
     }
 
+    @GetMapping("/wallets/{walletId}/cycles/{cycleId}/expenses")
+    List<ExpenseResponse> listCycleExpenses(@PathVariable UUID walletId, @PathVariable UUID cycleId) {
+        return expenseUseCase.listByCycle(walletId, cycleId);
+    }
+
     @PostMapping("/wallets/{walletId}/expenses")
     ResponseEntity<ExpenseResponse> createExpense(@PathVariable UUID walletId, @RequestBody ExpenseRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(expenseUseCase.create(walletId, request));

@@ -5,6 +5,7 @@ import br.com.ottonsam.toothy_planner_api.config.ApiException;
 import br.com.ottonsam.toothy_planner_api.financial_manager.dtos.ExpenseRequest;
 import br.com.ottonsam.toothy_planner_api.financial_manager.dtos.ExpenseResponse;
 import br.com.ottonsam.toothy_planner_api.financial_manager.entities.ExpenseEntity;
+import br.com.ottonsam.toothy_planner_api.financial_manager.repositories.ExpenseCycleRepository;
 import br.com.ottonsam.toothy_planner_api.financial_manager.repositories.ExpenseRepository;
 import java.util.List;
 import java.util.UUID;
@@ -17,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ExpenseUseCase {
 
     private final ExpenseRepository expenseRepository;
+    private final ExpenseCycleRepository cycleRepository;
     private final ExpenseWalletUseCase walletUseCase;
     private final ExpenseCategoryUseCase categoryUseCase;
     private final ExpenseCycleService cycleService;
@@ -24,11 +26,13 @@ public class ExpenseUseCase {
 
     public ExpenseUseCase(
             ExpenseRepository expenseRepository,
+            ExpenseCycleRepository cycleRepository,
             ExpenseWalletUseCase walletUseCase,
             ExpenseCategoryUseCase categoryUseCase,
             ExpenseCycleService cycleService,
             CurrentUserProvider currentUserProvider) {
         this.expenseRepository = expenseRepository;
+        this.cycleRepository = cycleRepository;
         this.walletUseCase = walletUseCase;
         this.categoryUseCase = categoryUseCase;
         this.cycleService = cycleService;
@@ -51,6 +55,20 @@ public class ExpenseUseCase {
         walletUseCase.findOwned(walletId, user.getId());
         return expenseRepository
                 .findAllByWalletIdAndWalletUserIdOrderByExpenseDateAscCreatedAtAsc(walletId, user.getId())
+                .stream()
+                .map(ExpenseResponse::from)
+                .toList();
+    }
+
+    public List<ExpenseResponse> listByCycle(UUID walletId, UUID cycleId) {
+        var user = currentUserProvider.get();
+        walletUseCase.findOwned(walletId, user.getId());
+        cycleRepository
+                .findByIdAndWalletIdAndWalletUserId(cycleId, walletId, user.getId())
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Cycle not found"));
+        return expenseRepository
+                .findAllByCycleIdAndWalletIdAndWalletUserIdOrderByExpenseDateAscCreatedAtAsc(
+                        cycleId, walletId, user.getId())
                 .stream()
                 .map(ExpenseResponse::from)
                 .toList();

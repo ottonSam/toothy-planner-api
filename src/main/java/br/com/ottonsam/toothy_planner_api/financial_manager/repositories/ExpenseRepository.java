@@ -16,6 +16,9 @@ public interface ExpenseRepository extends JpaRepository<ExpenseEntity, UUID> {
 
     List<ExpenseEntity> findAllByCycleId(UUID cycleId);
 
+    List<ExpenseEntity> findAllByCycleIdAndWalletIdAndWalletUserIdOrderByExpenseDateAscCreatedAtAsc(
+            UUID cycleId, UUID walletId, UUID userId);
+
     List<ExpenseEntity> findAllByParentExpenseId(UUID parentExpenseId);
 
     List<ExpenseEntity> findAllByParentExpenseIdAndCycle_EndsAtGreaterThanEqual(

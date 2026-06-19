@@ -226,6 +226,84 @@ class FinancialManagerIntegrationTests {
     }
 
     @Test
+    void listsAllExpenseTypesFromCycleInDateOrderAndEnforcesOwnership() throws Exception {
+        var userCookie = login("financial-cycle-expenses@example.com");
+        var otherCookie = login("financial-cycle-expenses-other@example.com");
+        var categoryId = createCategory(userCookie, "Gastos do ciclo");
+        var walletId = createWallet(userCookie, "Carteira por ciclo", 2000, 15);
+
+        createRecurringExpense(userCookie, walletId, categoryId, "Recorrente", 90.00, "2026-07-11");
+        createInstallmentExpenseByTotal(userCookie, walletId, categoryId, "Parcelado", 200.00, 2, "2026-07-12");
+        createExpense(userCookie, walletId, categoryId, "Pontual primeiro", 50.00, "2026-07-13");
+        createExpense(userCookie, walletId, categoryId, "Pontual segundo", 60.00, "2026-07-13");
+        createExpense(userCookie, walletId, categoryId, "Outro ciclo", 25.00, "2026-07-16");
+
+        var cycles = getJson(userCookie, "/api/v1/financial-manager/wallets/%s/cycles".formatted(walletId));
+        var julyCycleId = findCycleId(cycles, 7, 2026);
+        var julyExpenses = getJson(
+                userCookie, "/api/v1/financial-manager/wallets/%s/cycles/%s/expenses".formatted(walletId, julyCycleId));
+
+        assertThat(julyExpenses).hasSize(4);
+        assertThat(julyExpenses.findValuesAsText("type"))
+                .containsExactly("RECURRING", "INSTALLMENT", "ONE_TIME", "ONE_TIME");
+        assertThat(julyExpenses.findValuesAsText("expenseDate"))
+                .containsExactly("2026-07-11", "2026-07-12", "2026-07-13", "2026-07-13");
+        assertThat(julyExpenses.findValuesAsText("description"))
+                .containsExactly("Recorrente", "Parcelado", "Pontual primeiro", "Pontual segundo")
+                .doesNotContain("Outro ciclo");
+
+        mockMvc.perform(get(
+                                "/api/v1/financial-manager/wallets/{walletId}/cycles/{cycleId}/expenses",
+                                walletId,
+                                julyCycleId)
+                        .cookie(otherCookie))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Wallet not found"));
+
+        mockMvc.perform(get(
+                                "/api/v1/financial-manager/wallets/{walletId}/cycles/{cycleId}/expenses",
+                                walletId,
+                                UUID.randomUUID())
+                        .cookie(userCookie))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Cycle not found"));
+
+        var secondWalletId = createWallet(userCookie, "Outra carteira por ciclo", 1000, 15);
+        createExpense(userCookie, secondWalletId, categoryId, "Gasto outra carteira", 10.00, "2026-07-13");
+        var secondWalletCycles =
+                getJson(userCookie, "/api/v1/financial-manager/wallets/%s/cycles".formatted(secondWalletId));
+        var secondWalletCycleId = findCycleId(secondWalletCycles, 7, 2026);
+
+        mockMvc.perform(get(
+                                "/api/v1/financial-manager/wallets/{walletId}/cycles/{cycleId}/expenses",
+                                walletId,
+                                secondWalletCycleId)
+                        .cookie(userCookie))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Cycle not found"));
+    }
+
+    @Test
+    void returnsEmptyListWhenCycleHasNoExpenses() throws Exception {
+        var userCookie = login("financial-empty-cycle@example.com");
+        var categoryId = createCategory(userCookie, "Categoria temporaria");
+        var walletId = createWallet(userCookie, "Carteira ciclo vazio", 1000, 15);
+        var expenseId = createExpense(userCookie, walletId, categoryId, "Gasto temporario", 10.00, "2026-07-13");
+        var cycles = getJson(userCookie, "/api/v1/financial-manager/wallets/%s/cycles".formatted(walletId));
+        var cycleId = findCycleId(cycles, 7, 2026);
+
+        mockMvc.perform(delete("/api/v1/financial-manager/wallets/{walletId}/expenses/{expenseId}", walletId, expenseId)
+                        .cookie(userCookie))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/v1/financial-manager/wallets/{walletId}/cycles/{cycleId}/expenses", walletId, cycleId)
+                        .cookie(userCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$").isEmpty());
+    }
+
+    @Test
     void rejectsInvalidInstallmentAmountChoiceAndUsedCategoryDeletion() throws Exception {
         var userCookie = login("financial-validation@example.com");
         var categoryId = createCategory(userCookie, "Compras");
@@ -291,6 +369,23 @@ class FinancialManagerIntegrationTests {
                                 "description", description,
                                 "spendingGoal", spendingGoal,
                                 "cycleEndDay", cycleEndDay))))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse();
+        return readId(response.getContentAsString());
+    }
+
+    private UUID createExpense(
+            Cookie accessToken, UUID walletId, UUID categoryId, String description, double amount, String expenseDate)
+            throws Exception {
+        var response = mockMvc.perform(post("/api/v1/financial-manager/wallets/{walletId}/expenses", walletId)
+                        .cookie(accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "categoryId", categoryId,
+                                "description", description,
+                                "amount", amount,
+                                "expenseDate", expenseDate))))
                 .andExpect(status().isCreated())
                 .andReturn()
                 .getResponse();
