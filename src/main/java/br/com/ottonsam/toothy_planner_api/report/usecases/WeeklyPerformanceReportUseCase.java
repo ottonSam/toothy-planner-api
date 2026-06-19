@@ -139,11 +139,13 @@ public class WeeklyPerformanceReportUseCase {
         var activityMetrics = new ArrayList<Map<String, Object>>();
         var expectedTotal = 0;
         var deliveredTotal = 0;
+        var deliveryPercentageTotal = 0.0;
         for (var activity : activities) {
             var metric = activityMetric(activity, weekStartsAt, weekEndsAt);
             activityMetrics.add(metric);
             expectedTotal += activity.getGoal();
             deliveredTotal += (int) metric.get("delivered");
+            deliveryPercentageTotal += (double) metric.get("deliveryPercentage");
         }
 
         var metrics = new LinkedHashMap<String, Object>();
@@ -157,7 +159,7 @@ public class WeeklyPerformanceReportUseCase {
         metrics.put("totalActivities", activities.size());
         metrics.put("expectedTotal", expectedTotal);
         metrics.put("deliveredTotal", deliveredTotal);
-        metrics.put("deliveryPercentage", percentage(deliveredTotal, expectedTotal));
+        metrics.put("deliveryPercentage", activities.isEmpty() ? 0.0 : deliveryPercentageTotal / activities.size());
         metrics.put("generatedAt", OffsetDateTime.now(clock).toString());
         metrics.put("activities", activityMetrics);
         return metrics;
@@ -248,35 +250,14 @@ public class WeeklyPerformanceReportUseCase {
     private String buildPrompt(
             Map<String, Object> metrics, List<Map<String, Object>> previousReports, String userFeedback) {
         return """
-                Voce e um coach de desempenho especializado na metodologia 12 Week Year.
+                Voce e um avaliador de desempenho semanal da metodologia 12 Week Year.
 
-                Gere um relatorio semanal de desempenho em Markdown, inteiramente em portugues
-                do Brasil, para um usuario que esta executando um calendario de metas de 12
-                semanas.
-
-                Principios que devem guiar a analise:
-                - Foque em execucao, nao em motivacao generica.
-                - Compare compromissos planejados com entregas reais.
-                - Identifique padroes de consistencia, timing e cumprimento.
-                - Trate a execucao semanal como principal indicador de alcance das metas.
-                - Recomende ajustes concretos para a proxima semana.
-                - Use tom direto, pratico e respeitoso.
-                - Nao invente dados que nao foram fornecidos.
-                - Nao crie metricas novas alem das informadas.
-                - Quando houver progresso acima da meta, reconheca o excedente, mas considere a
-                  metrica percentual limitada a 100%.
-
-                Contexto do calendario:
-                {{calendar_context}}
+                Escreva em portugues do Brasil, em Markdown, com no maximo 200 palavras.
+                Use tom direto, pratico e respeitoso. Nao use motivacao generica, nao invente
+                dados e nao crie novas metricas.
 
                 Metricas da semana atual:
                 {{current_week_metrics}}
-
-                Metricas das atividades:
-                {{activities_metrics}}
-
-                Registros de progresso:
-                {{progress_records}}
 
                 Relatorios das semanas anteriores, do mais recente para o mais antigo:
                 {{previous_reports}}
@@ -284,65 +265,21 @@ public class WeeklyPerformanceReportUseCase {
                 Feedback do usuario sobre a semana:
                 {{user_feedback}}
 
-                Gere o relatorio em Markdown com exatamente estas secoes:
+                Regras da avaliacao:
+                - Relacione o que foi entregue na semana atual com ate 3 semanas anteriores e
+                  com o feedback do usuario.
+                - Se nao houver historico, avalie somente a semana atual e o feedback.
+                - Considere sucesso semanal somente quando deliveryPercentage for maior que
+                  85%. O valor 85% exato nao deve ser classificado automaticamente como sucesso.
+                - Nao liste todas as metricas nem detalhe cada atividade.
+                - Produza exatamente estas duas secoes:
 
-                # Relatorio Semanal de Desempenho
+                # Avaliacao da Semana
 
-                ## Resumo
-                Resuma brevemente como a semana performou em relacao ao plano.
-
-                ## Metricas de Execucao
-                Liste as principais metricas de entrega, incluindo total esperado, total
-                entregue, percentual de entrega da semana e destaques relevantes por atividade.
-
-                ## Analise de Timing
-                Analise quando o progresso foi registrado, quantos dias restavam para o fim da
-                semana e se a execucao foi antecipada, tardia, concentrada ou consistente.
-
-                ## Padroes Das Semanas Anteriores
-                Compare a semana atual com ate 3 relatorios anteriores e identifique tendencias.
-                Se nao houver relatorios anteriores, informe que ainda nao ha historico
-                suficiente.
-
-                ## Feedback Do Usuario
-                Conecte o sentimento e o feedback textual do usuario com os dados de execucao.
-
-                ## Recomendacoes Para A Proxima Semana
-                Forneca recomendacoes praticas para a proxima semana, alinhadas ao 12 Week Year.
-
-                ## Foco De Compromisso
-                Finalize com 3 compromissos ou ajustes claros para a proxima semana.
-                """.replace(
-                        "{{calendar_context}}",
-                        toJson(Map.of(
-                                "calendarId",
-                                metrics.get("calendarId"),
-                                "calendarDescription",
-                                metrics.get("calendarDescription"),
-                                "weekStartsOn",
-                                metrics.get("weekStartsOn"),
-                                "weekEndsOn",
-                                metrics.get("weekEndsOn"))))
-                .replace("{{current_week_metrics}}", toJson(metrics))
-                .replace("{{activities_metrics}}", toJson(metrics.get("activities")))
-                .replace("{{progress_records}}", toJson(progressRecordsFromMetrics(metrics)))
+                ## Recomendacao para a Proxima Semana
+                """.replace("{{current_week_metrics}}", toJson(metrics))
                 .replace("{{previous_reports}}", toJson(previousReports))
                 .replace("{{user_feedback}}", userFeedback);
-    }
-
-    @SuppressWarnings("unchecked")
-    private List<Object> progressRecordsFromMetrics(Map<String, Object> metrics) {
-        var records = new ArrayList<>();
-        for (var activity : (List<Map<String, Object>>) metrics.get("activities")) {
-            records.add(Map.of(
-                    "activityId",
-                    activity.get("activityId"),
-                    "description",
-                    activity.get("description"),
-                    "progressRecords",
-                    activity.get("progressRecords")));
-        }
-        return records;
     }
 
     private double percentage(int delivered, int expected) {

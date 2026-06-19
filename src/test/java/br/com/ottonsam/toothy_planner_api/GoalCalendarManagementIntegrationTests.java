@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -44,17 +45,25 @@ class GoalCalendarManagementIntegrationTests {
     private final ObjectMapper objectMapper;
     private final UserRepository userRepository;
     private final UserActivationCodeRepository activationCodeRepository;
+    private final CapturingWeeklyReportAiClient weeklyReportAiClient;
 
     @Autowired
     GoalCalendarManagementIntegrationTests(
             MockMvc mockMvc,
             ObjectMapper objectMapper,
             UserRepository userRepository,
-            UserActivationCodeRepository activationCodeRepository) {
+            UserActivationCodeRepository activationCodeRepository,
+            WeeklyReportAiClient weeklyReportAiClient) {
         this.mockMvc = mockMvc;
         this.objectMapper = objectMapper;
         this.userRepository = userRepository;
         this.activationCodeRepository = activationCodeRepository;
+        this.weeklyReportAiClient = (CapturingWeeklyReportAiClient) weeklyReportAiClient;
+    }
+
+    @BeforeEach
+    void resetWeeklyReportAiClient() {
+        weeklyReportAiClient.reset();
     }
 
     @Test
@@ -304,7 +313,7 @@ class GoalCalendarManagementIntegrationTests {
         mockMvc.perform(post("/api/v1/activities/progress/time")
                         .cookie(userCookie)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("activityId", timeActivityId, "time", "2h"))))
+                        .content(json(Map.of("activityId", timeActivityId, "time", "30m"))))
                 .andExpect(status().isOk());
 
         mockMvc.perform(post("/api/v1/calendars/{calendarId}/weeks/{week}/reports", calendarId, 1)
@@ -317,16 +326,29 @@ class GoalCalendarManagementIntegrationTests {
                 .andExpect(jsonPath("$.weekStartsAt").value("2026-01-01"))
                 .andExpect(jsonPath("$.weekEndsAt").value("2026-01-07"))
                 .andExpect(jsonPath("$.metrics.expectedTotal").value(71))
-                .andExpect(jsonPath("$.metrics.deliveredTotal").value(136))
-                .andExpect(jsonPath("$.metrics.deliveryPercentage").value(100.0))
+                .andExpect(jsonPath("$.metrics.deliveredTotal").value(46))
+                .andExpect(jsonPath("$.metrics.deliveryPercentage").value(83.33333333333333))
                 .andExpect(jsonPath("$.metrics.activities[1].delivered").value(15))
                 .andExpect(
                         jsonPath("$.metrics.activities[1].deliveryPercentage").value(100.0))
-                .andExpect(jsonPath("$.metrics.activities[2].delivered").value(120))
+                .andExpect(jsonPath("$.metrics.activities[2].delivered").value(30))
                 .andExpect(
-                        jsonPath("$.metrics.activities[2].deliveryPercentage").value(100.0))
+                        jsonPath("$.metrics.activities[2].deliveryPercentage").value(50.0))
                 .andExpect(jsonPath("$.markdownReport")
-                        .value("# Relatorio Semanal de Desempenho\n\n## Resumo\nRelatorio gerado."));
+                        .value("# Avaliacao da Semana\n\n## Recomendacao para a Proxima Semana\nRelatorio gerado."));
+
+        assertThat(weeklyReportAiClient.lastPrompt())
+                .contains("com no maximo 200 palavras")
+                .contains("# Avaliacao da Semana")
+                .contains("## Recomendacao para a Proxima Semana")
+                .contains("maior que")
+                .contains("85% exato")
+                .contains("\"deliveryPercentage\":83.33333333333333")
+                .contains("Foi uma semana produtiva, mas concentrei tudo no fim.")
+                .contains("Relatorios das semanas anteriores, do mais recente para o mais antigo:\n[]")
+                .doesNotContain("## Metricas de Execucao")
+                .doesNotContain("## Analise de Timing")
+                .doesNotContain("## Foco De Compromisso");
 
         mockMvc.perform(post("/api/v1/calendars/{calendarId}/weeks/{week}/reports", calendarId, 1)
                         .cookie(userCookie)
@@ -344,6 +366,26 @@ class GoalCalendarManagementIntegrationTests {
                         .cookie(userCookie))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].week").value(1));
+    }
+
+    @Test
+    void usesZeroOverallDeliveryPercentageWhenWeekHasNoActivities() throws Exception {
+        var userCookie = login("report-without-activities@example.com");
+        var calendarId = createCalendar(userCookie, "Empty report calendar", 4);
+
+        mockMvc.perform(post("/api/v1/calendars/{calendarId}/weeks/{week}/reports", calendarId, 1)
+                        .cookie(userCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("userFeedback", "Nao havia atividades planejadas."))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.metrics.expectedTotal").value(0))
+                .andExpect(jsonPath("$.metrics.deliveredTotal").value(0))
+                .andExpect(jsonPath("$.metrics.deliveryPercentage").value(0.0))
+                .andExpect(jsonPath("$.metrics.activities").isEmpty());
+
+        assertThat(weeklyReportAiClient.lastPrompt())
+                .contains("\"deliveryPercentage\":0.0")
+                .contains("Se nao houver historico, avalie somente a semana atual e o feedback.");
     }
 
     @Test
@@ -459,6 +501,25 @@ class GoalCalendarManagementIntegrationTests {
         return objectMapper.writeValueAsString(value);
     }
 
+    static class CapturingWeeklyReportAiClient implements WeeklyReportAiClient {
+
+        private String lastPrompt;
+
+        @Override
+        public String generate(String prompt) {
+            lastPrompt = prompt;
+            return "# Avaliacao da Semana\n\n## Recomendacao para a Proxima Semana\nRelatorio gerado.";
+        }
+
+        String lastPrompt() {
+            return lastPrompt;
+        }
+
+        void reset() {
+            lastPrompt = null;
+        }
+    }
+
     @TestConfiguration
     static class TestStorageConfiguration {
 
@@ -471,7 +532,7 @@ class GoalCalendarManagementIntegrationTests {
         @Bean
         @Primary
         WeeklyReportAiClient weeklyReportAiClient() {
-            return prompt -> "# Relatorio Semanal de Desempenho\n\n## Resumo\nRelatorio gerado.";
+            return new CapturingWeeklyReportAiClient();
         }
 
         @Bean
