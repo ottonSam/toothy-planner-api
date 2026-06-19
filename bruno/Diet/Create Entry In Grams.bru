@@ -7,11 +7,12 @@ meta {
 post {
   url: {{baseUrl}}/api/v1/diet/entries
   body: json
+  auth: none
 }
 
 body:json {
   {
-    "foodName": "ovo",
+    "foodName": "Maçã",
     "quantity": 100.00,
     "unit": "GRAMS",
     "entryDate": "2026-07-13"
@@ -22,4 +23,3 @@ docs {
   Requires authenticated access_token cookie.
   Creates the food through DeepSeek only if it does not exist for the user.
 }
-

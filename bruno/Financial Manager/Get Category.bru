@@ -6,14 +6,15 @@ meta {
 
 get {
   url: {{baseUrl}}/api/v1/financial-manager/categories/{{categoryId}}
+  body: none
+  auth: none
 }
 
 vars:pre-request {
-  categoryId: 00000000-0000-0000-0000-000000000000
+  categoryId: 190e5224-d8f7-4df8-8a6f-2aa38efcf8ad
 }
 
 docs {
   Requires authenticated access_token cookie.
   Expected response: 200 OK.
 }
-

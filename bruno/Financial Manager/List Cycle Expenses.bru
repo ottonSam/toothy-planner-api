@@ -1,0 +1,20 @@
+meta {
+  name: List Cycle Expenses
+  type: http
+  seq: 15
+}
+
+get {
+  url: {{baseUrl}}/api/v1/financial-manager/wallets/{{walletId}}/cycles/{{cycleId}}/expenses
+}
+
+vars:pre-request {
+  walletId: 00000000-0000-0000-0000-000000000000
+  cycleId: 00000000-0000-0000-0000-000000000000
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  Returns ONE_TIME, INSTALLMENT and RECURRING expenses from the selected cycle.
+  Expected response: 200 OK.
+}

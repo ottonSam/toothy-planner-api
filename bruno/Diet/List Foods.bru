@@ -6,14 +6,15 @@ meta {
 
 get {
   url: {{baseUrl}}/api/v1/diet/foods?name={{foodName}}
+  body: none
+  auth: none
 }
 
 vars:pre-request {
-  foodName: ovo
+  foodName: ma
 }
 
 docs {
   Requires authenticated access_token cookie.
   Used by frontend autocomplete/autoselect.
 }
-

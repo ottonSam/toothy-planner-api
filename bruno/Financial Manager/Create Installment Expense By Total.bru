@@ -7,11 +7,12 @@ meta {
 post {
   url: {{baseUrl}}/api/v1/financial-manager/wallets/{{walletId}}/installment-expenses
   body: json
+  auth: none
 }
 
 body:json {
   {
-    "categoryId": "00000000-0000-0000-0000-000000000000",
+    "categoryId": "190e5224-d8f7-4df8-8a6f-2aa38efcf8ad",
     "description": "Notebook",
     "totalAmount": 3500.00,
     "installments": 10,
@@ -20,7 +21,7 @@ body:json {
 }
 
 vars:pre-request {
-  walletId: 00000000-0000-0000-0000-000000000000
+  walletId: 26697c4f-3eef-4821-a6d5-a1d09caa5ff8
 }
 
 docs {
@@ -28,4 +29,3 @@ docs {
   Creates installment expenses in all corresponding cycles.
   Expected response: 201 Created.
 }
-
