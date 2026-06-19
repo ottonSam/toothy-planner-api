@@ -206,14 +206,15 @@ Para atividades `TIME`, `goal` e `progress` sao retornados em minutos.
       }
     ]
   },
-  "markdownReport": "# Relatorio Semanal de Desempenho\n\n...",
+  "markdownReport": "# Avaliacao da Semana\n\n...\n\n## Recomendacao para a Proxima Semana\n\n...",
   "createdAt": "2026-06-16T10:00:00-03:00",
   "updatedAt": "2026-06-16T10:00:00-03:00"
 }
 ```
 
-Percentuais de relatorio sao limitados a `100.0`, mesmo quando o progresso real
-ultrapassa a meta.
+Percentuais por atividade sao limitados a `100.0`, mesmo quando o progresso real
+ultrapassa a meta. O percentual geral e a media aritmetica dos percentuais das
+atividades, com o mesmo peso para cada atividade.
 
 ## Endpoints de usuarios
 
@@ -1099,7 +1100,7 @@ Resposta `200 OK`:
     "weekEndsAt": "2026-06-15",
     "userFeedback": "Foi uma semana produtiva.",
     "metrics": {},
-    "markdownReport": "# Relatorio Semanal de Desempenho\n\n...",
+    "markdownReport": "# Avaliacao da Semana\n\n...\n\n## Recomendacao para a Proxima Semana\n\n...",
     "createdAt": "2026-06-16T10:00:00-03:00",
     "updatedAt": "2026-06-16T10:00:00-03:00"
   }

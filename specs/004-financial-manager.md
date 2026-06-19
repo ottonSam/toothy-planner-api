@@ -362,12 +362,16 @@ Regras:
 - `GET /api/v1/financial-manager/wallets/{walletId}/cycles`
 - `GET /api/v1/financial-manager/wallets/{walletId}/cycles/{cycleId}`
 - `GET /api/v1/financial-manager/wallets/{walletId}/cycles/{cycleId}/metrics`
+- `GET /api/v1/financial-manager/wallets/{walletId}/cycles/{cycleId}/expenses`
 
 Regras:
 
 - Nao deve existir endpoint para criar ciclo manualmente.
 - Ciclos devem ser criados automaticamente pelos fluxos de gastos, parcelas e
   recorrencias.
+- A listagem de gastos do ciclo deve retornar gastos `ONE_TIME`, `INSTALLMENT`
+  e `RECURRING`, ordenados por `expenseDate` e `createdAt`.
+- A listagem deve retornar um array vazio quando o ciclo nao possuir gastos.
 
 ### Expenses
 
