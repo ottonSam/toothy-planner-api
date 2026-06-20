@@ -1,0 +1,12 @@
+.docker
+.env
+.git
+.github
+.idea
+.vscode
+bruno
+docs
+node_modules
+specs
+target
+*.iml
