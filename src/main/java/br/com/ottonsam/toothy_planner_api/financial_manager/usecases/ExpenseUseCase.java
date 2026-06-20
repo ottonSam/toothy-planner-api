@@ -5,8 +5,10 @@ import br.com.ottonsam.toothy_planner_api.config.ApiException;
 import br.com.ottonsam.toothy_planner_api.financial_manager.dtos.ExpenseRequest;
 import br.com.ottonsam.toothy_planner_api.financial_manager.dtos.ExpenseResponse;
 import br.com.ottonsam.toothy_planner_api.financial_manager.entities.ExpenseEntity;
+import br.com.ottonsam.toothy_planner_api.financial_manager.entities.ExpenseType;
 import br.com.ottonsam.toothy_planner_api.financial_manager.repositories.ExpenseCycleRepository;
 import br.com.ottonsam.toothy_planner_api.financial_manager.repositories.ExpenseRepository;
+import br.com.ottonsam.toothy_planner_api.financial_manager.repositories.RecurringExpenseRepository;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -19,6 +21,7 @@ public class ExpenseUseCase {
 
     private final ExpenseRepository expenseRepository;
     private final ExpenseCycleRepository cycleRepository;
+    private final RecurringExpenseRepository recurringExpenseRepository;
     private final ExpenseWalletUseCase walletUseCase;
     private final ExpenseCategoryUseCase categoryUseCase;
     private final ExpenseCycleService cycleService;
@@ -27,12 +30,14 @@ public class ExpenseUseCase {
     public ExpenseUseCase(
             ExpenseRepository expenseRepository,
             ExpenseCycleRepository cycleRepository,
+            RecurringExpenseRepository recurringExpenseRepository,
             ExpenseWalletUseCase walletUseCase,
             ExpenseCategoryUseCase categoryUseCase,
             ExpenseCycleService cycleService,
             CurrentUserProvider currentUserProvider) {
         this.expenseRepository = expenseRepository;
         this.cycleRepository = cycleRepository;
+        this.recurringExpenseRepository = recurringExpenseRepository;
         this.walletUseCase = walletUseCase;
         this.categoryUseCase = categoryUseCase;
         this.cycleService = cycleService;
@@ -91,7 +96,19 @@ public class ExpenseUseCase {
 
     public void delete(UUID walletId, UUID expenseId) {
         var user = currentUserProvider.get();
-        expenseRepository.delete(findOwned(walletId, expenseId, user.getId()));
+        var expense = findOwned(walletId, expenseId, user.getId());
+        if (expense.getType() != ExpenseType.RECURRING) {
+            expenseRepository.delete(expense);
+            return;
+        }
+        var recurrenceId = expense.getRecurrenceId();
+        var recurringExpense = recurringExpenseRepository
+                .findByIdAndWalletIdAndWalletUserId(recurrenceId, walletId, user.getId())
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Recurring expense not found"));
+        recurringExpense.cancel(expense.getCycle().getStartsAt());
+        expenseRepository.deleteAll(expenseRepository.findAllByRecurrenceIdAndCycle_StartsAtGreaterThanEqual(
+                recurrenceId, expense.getCycle().getStartsAt()));
+        recurringExpenseRepository.save(recurringExpense);
     }
 
     private ExpenseEntity findOwned(UUID walletId, UUID expenseId, UUID userId) {

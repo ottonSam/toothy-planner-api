@@ -270,6 +270,14 @@ Regras:
   em ciclos seguintes devem ser removidos.
 - O cancelamento nao deve remover gastos recorrentes de ciclos anteriores ao
   ciclo de cancelamento.
+- Ao excluir diretamente um gasto do tipo `RECURRING`, o gasto selecionado e
+  todos os gastos da mesma recorrencia nos ciclos seguintes devem ser removidos.
+- A exclusao direta de um gasto `RECURRING` deve cancelar a recorrencia pai no
+  ciclo selecionado, impedindo a geracao em novos ciclos.
+- A exclusao direta deve preservar gastos da mesma recorrencia em ciclos
+  anteriores e nao deve afetar outras recorrencias.
+- A exclusao direta de gastos `ONE_TIME` e `INSTALLMENT` deve remover somente o
+  gasto selecionado.
 
 ## Metricas Financeiras
 

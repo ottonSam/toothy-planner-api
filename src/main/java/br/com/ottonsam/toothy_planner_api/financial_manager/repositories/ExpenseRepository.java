@@ -28,6 +28,9 @@ public interface ExpenseRepository extends JpaRepository<ExpenseEntity, UUID> {
 
     List<ExpenseEntity> findAllByRecurrenceIdAndCycle_StartsAtAfter(UUID recurrenceId, LocalDate cycleStartDate);
 
+    List<ExpenseEntity> findAllByRecurrenceIdAndCycle_StartsAtGreaterThanEqual(
+            UUID recurrenceId, LocalDate cycleStartDate);
+
     List<ExpenseEntity> findAllByRecurrenceIdAndCycle_EndsAtGreaterThanEqual(UUID recurrenceId, LocalDate cycleEndDate);
 
     Optional<ExpenseEntity> findByIdAndWalletIdAndWalletUserId(UUID id, UUID walletId, UUID userId);

@@ -15,6 +15,8 @@ vars:pre-request {
 
 docs {
   Requires authenticated access_token cookie.
+  For RECURRING expenses, deletes the selected occurrence and all following
+  occurrences and cancels the parent recurrence.
+  ONE_TIME and INSTALLMENT expenses are deleted individually.
   Expected response: 204 No Content.
 }
-

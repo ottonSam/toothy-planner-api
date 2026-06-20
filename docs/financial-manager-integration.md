@@ -445,7 +445,16 @@ recursos pai.
 
 Resposta: `204 No Content`.
 
-Remove somente o gasto informado.
+Para `ONE_TIME` e `INSTALLMENT`, remove somente o gasto informado.
+
+Para `RECURRING`, remove a ocorrencia selecionada e todas as ocorrencias
+posteriores com o mesmo `recurrenceId`. A recorrencia pai e marcada como
+cancelada no inicio do ciclo selecionado, impedindo novas geracoes. Ocorrencias
+de ciclos anteriores e outras recorrencias sao preservadas.
+
+Esse comportamento difere do endpoint `/recurring-expenses/{id}/cancel`: o
+cancelamento preserva a ocorrencia do ciclo selecionado e remove somente as
+posteriores.
 
 ## Endpoints de parcelamentos
 

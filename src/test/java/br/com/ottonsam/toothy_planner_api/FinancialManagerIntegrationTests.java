@@ -226,6 +226,89 @@ class FinancialManagerIntegrationTests {
     }
 
     @Test
+    void deletingRecurringExpenseRemovesCurrentAndFollowingOccurrences() throws Exception {
+        var userCookie = login("financial-delete-recurring@example.com");
+        var otherCookie = login("financial-delete-recurring-other@example.com");
+        var categoryId = createCategory(userCookie, "Recorrencias para excluir");
+        var walletId = createWallet(userCookie, "Carteira exclusao recorrente", 2000, 15);
+
+        createExpense(userCookie, walletId, categoryId, "Criar julho", 1.00, "2026-07-13");
+        createExpense(userCookie, walletId, categoryId, "Criar agosto", 1.00, "2026-07-16");
+        createExpense(userCookie, walletId, categoryId, "Criar setembro", 1.00, "2026-08-16");
+        createExpense(userCookie, walletId, categoryId, "Criar outubro", 1.00, "2026-09-16");
+
+        var deletedRecurrenceId =
+                createRecurringExpense(userCookie, walletId, categoryId, "Internet excluida", 99.90, "2026-07-13");
+        createRecurringExpense(userCookie, walletId, categoryId, "Streaming mantido", 49.90, "2026-07-13");
+
+        var cycles = getJson(userCookie, "/api/v1/financial-manager/wallets/%s/cycles".formatted(walletId));
+        var augustCycleId = findCycleId(cycles, 8, 2026);
+        var expenses = getJson(userCookie, "/api/v1/financial-manager/wallets/%s/expenses".formatted(walletId));
+        var augustRecurringExpenseId = findExpenseId(expenses, "Internet excluida", augustCycleId);
+
+        mockMvc.perform(delete(
+                                "/api/v1/financial-manager/wallets/{walletId}/expenses/{expenseId}",
+                                walletId,
+                                augustRecurringExpenseId)
+                        .cookie(otherCookie))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Expense not found"));
+
+        mockMvc.perform(delete(
+                                "/api/v1/financial-manager/wallets/{walletId}/expenses/{expenseId}",
+                                walletId,
+                                augustRecurringExpenseId)
+                        .cookie(userCookie))
+                .andExpect(status().isNoContent());
+
+        var expensesAfterDelete =
+                getJson(userCookie, "/api/v1/financial-manager/wallets/%s/expenses".formatted(walletId));
+        assertThat(countByDescription(expensesAfterDelete, "Internet excluida")).isEqualTo(1);
+        assertThat(countByDescription(expensesAfterDelete, "Streaming mantido")).isEqualTo(4);
+
+        mockMvc.perform(get(
+                                "/api/v1/financial-manager/wallets/{walletId}/recurring-expenses/{recurringExpenseId}",
+                                walletId,
+                                deletedRecurrenceId)
+                        .cookie(userCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.active").value(false))
+                .andExpect(jsonPath("$.canceledAt").value("2026-07-16"));
+
+        createExpense(userCookie, walletId, categoryId, "Criar novembro", 1.00, "2026-10-16");
+        var expensesWithNovember =
+                getJson(userCookie, "/api/v1/financial-manager/wallets/%s/expenses".formatted(walletId));
+        assertThat(countByDescription(expensesWithNovember, "Internet excluida"))
+                .isEqualTo(1);
+        assertThat(countByDescription(expensesWithNovember, "Streaming mantido"))
+                .isEqualTo(5);
+    }
+
+    @Test
+    void deletingOneTimeAndInstallmentExpensesRemainsIndividual() throws Exception {
+        var userCookie = login("financial-delete-individual@example.com");
+        var categoryId = createCategory(userCookie, "Exclusoes individuais");
+        var walletId = createWallet(userCookie, "Carteira exclusoes individuais", 2000, 15);
+        var firstOneTimeId = createExpense(userCookie, walletId, categoryId, "Pontual excluido", 10.00, "2026-07-13");
+        createExpense(userCookie, walletId, categoryId, "Pontual mantido", 20.00, "2026-07-13");
+        createInstallmentExpenseByTotal(
+                userCookie, walletId, categoryId, "Parcelas individuais", 90.00, 3, "2026-07-13");
+
+        var expenses = getJson(userCookie, "/api/v1/financial-manager/wallets/%s/expenses".formatted(walletId));
+        var installmentId = findExpenseIdByInstallmentNumber(expenses, "Parcelas individuais", 2);
+
+        deleteExpense(userCookie, walletId, firstOneTimeId);
+        deleteExpense(userCookie, walletId, installmentId);
+
+        var expensesAfterDelete =
+                getJson(userCookie, "/api/v1/financial-manager/wallets/%s/expenses".formatted(walletId));
+        assertThat(countByDescription(expensesAfterDelete, "Pontual excluido")).isZero();
+        assertThat(countByDescription(expensesAfterDelete, "Pontual mantido")).isEqualTo(1);
+        assertThat(countByDescription(expensesAfterDelete, "Parcelas individuais"))
+                .isEqualTo(2);
+    }
+
+    @Test
     void listsAllExpenseTypesFromCycleInDateOrderAndEnforcesOwnership() throws Exception {
         var userCookie = login("financial-cycle-expenses@example.com");
         var otherCookie = login("financial-cycle-expenses-other@example.com");
@@ -442,10 +525,41 @@ class FinancialManagerIntegrationTests {
         return objectMapper.readTree(response.getContentAsString());
     }
 
+    private void deleteExpense(Cookie accessToken, UUID walletId, UUID expenseId) throws Exception {
+        mockMvc.perform(delete("/api/v1/financial-manager/wallets/{walletId}/expenses/{expenseId}", walletId, expenseId)
+                        .cookie(accessToken))
+                .andExpect(status().isNoContent());
+    }
+
     private long countByType(JsonNode expenses, String type) {
         return java.util.stream.StreamSupport.stream(expenses.spliterator(), false)
                 .filter(expense -> type.equals(expense.get("type").asText()))
                 .count();
+    }
+
+    private long countByDescription(JsonNode expenses, String description) {
+        return java.util.stream.StreamSupport.stream(expenses.spliterator(), false)
+                .filter(expense -> description.equals(expense.get("description").asText()))
+                .count();
+    }
+
+    private UUID findExpenseId(JsonNode expenses, String description, UUID cycleId) {
+        return java.util.stream.StreamSupport.stream(expenses.spliterator(), false)
+                .filter(expense -> description.equals(expense.get("description").asText()))
+                .filter(expense ->
+                        cycleId.toString().equals(expense.get("cycleId").asText()))
+                .map(expense -> UUID.fromString(expense.get("id").asText()))
+                .findFirst()
+                .orElseThrow();
+    }
+
+    private UUID findExpenseIdByInstallmentNumber(JsonNode expenses, String description, int installmentNumber) {
+        return java.util.stream.StreamSupport.stream(expenses.spliterator(), false)
+                .filter(expense -> description.equals(expense.get("description").asText()))
+                .filter(expense -> expense.get("installmentNumber").asInt() == installmentNumber)
+                .map(expense -> UUID.fromString(expense.get("id").asText()))
+                .findFirst()
+                .orElseThrow();
     }
 
     private UUID findCycleId(JsonNode cycles, int referenceMonth, int referenceYear) {
