@@ -179,6 +179,55 @@ class FinancialManagerIntegrationTests {
     }
 
     @Test
+    void calculatesCycleSpendingByCategoryForChart() throws Exception {
+        var userCookie = login("financial-category-chart@example.com");
+        var otherCookie = login("financial-category-chart-other@example.com");
+        var foodCategoryId = createCategory(userCookie, "Alimentacao");
+        var healthCategoryId = createCategory(userCookie, "Saude");
+        var transportCategoryId = createCategory(userCookie, "Transporte");
+        createCategory(userCookie, "Lazer");
+        var walletId = createWallet(userCookie, "Carteira grafico categorias", 3000, 15);
+
+        createExpense(userCookie, walletId, foodCategoryId, "Mercado", 100.00, "2026-07-10");
+        createInstallmentExpenseByTotal(
+                userCookie, walletId, foodCategoryId, "Compra parcelada", 100.00, 2, "2026-07-11");
+        createRecurringExpense(userCookie, walletId, foodCategoryId, "Assinatura", 50.00, "2026-07-12");
+        createExpense(userCookie, walletId, healthCategoryId, "Farmacia", 100.00, "2026-07-13");
+        createExpense(userCookie, walletId, transportCategoryId, "Taxi", 100.00, "2026-07-14");
+        createExpense(userCookie, walletId, foodCategoryId, "Outro ciclo", 300.00, "2026-07-16");
+
+        var cycles = getJson(userCookie, "/api/v1/financial-manager/wallets/%s/cycles".formatted(walletId));
+        var julyCycleId = findCycleId(cycles, 7, 2026);
+
+        mockMvc.perform(get(
+                                "/api/v1/financial-manager/wallets/{walletId}/cycles/{cycleId}/metrics",
+                                walletId,
+                                julyCycleId)
+                        .cookie(userCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalSpent").value(400.00))
+                .andExpect(jsonPath("$.spendingByCategory").isArray())
+                .andExpect(jsonPath("$.spendingByCategory.length()").value(3))
+                .andExpect(jsonPath("$.spendingByCategory[0].category.name").value("Alimentacao"))
+                .andExpect(jsonPath("$.spendingByCategory[0].totalSpent").value(200.00))
+                .andExpect(jsonPath("$.spendingByCategory[0].percentage").value(50.00))
+                .andExpect(jsonPath("$.spendingByCategory[1].category.name").value("Saude"))
+                .andExpect(jsonPath("$.spendingByCategory[1].totalSpent").value(100.00))
+                .andExpect(jsonPath("$.spendingByCategory[1].percentage").value(25.00))
+                .andExpect(jsonPath("$.spendingByCategory[2].category.name").value("Transporte"))
+                .andExpect(jsonPath("$.spendingByCategory[2].totalSpent").value(100.00))
+                .andExpect(jsonPath("$.spendingByCategory[2].percentage").value(25.00));
+
+        mockMvc.perform(get(
+                                "/api/v1/financial-manager/wallets/{walletId}/cycles/{cycleId}/metrics",
+                                walletId,
+                                julyCycleId)
+                        .cookie(otherCookie))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Wallet not found"));
+    }
+
+    @Test
     void createsInstallmentsRecurringExpensesAndCancelsFollowingRecurringCycles() throws Exception {
         var userCookie = login("financial-installments@example.com");
         var categoryId = createCategory(userCookie, "Servicos");
@@ -384,6 +433,13 @@ class FinancialManagerIntegrationTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isArray())
                 .andExpect(jsonPath("$").isEmpty());
+
+        mockMvc.perform(get("/api/v1/financial-manager/wallets/{walletId}/cycles/{cycleId}/metrics", walletId, cycleId)
+                        .cookie(userCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalSpent").value(0.00))
+                .andExpect(jsonPath("$.spendingByCategory").isArray())
+                .andExpect(jsonPath("$.spendingByCategory").isEmpty());
     }
 
     @Test

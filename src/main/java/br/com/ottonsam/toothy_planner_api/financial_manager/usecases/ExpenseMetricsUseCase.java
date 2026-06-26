@@ -2,7 +2,10 @@ package br.com.ottonsam.toothy_planner_api.financial_manager.usecases;
 
 import br.com.ottonsam.toothy_planner_api.auth.usecases.CurrentUserProvider;
 import br.com.ottonsam.toothy_planner_api.config.ApiException;
+import br.com.ottonsam.toothy_planner_api.financial_manager.dtos.ExpenseCategorySummaryResponse;
 import br.com.ottonsam.toothy_planner_api.financial_manager.dtos.ExpenseCycleMetricsResponse;
+import br.com.ottonsam.toothy_planner_api.financial_manager.dtos.ExpenseSpendingByCategoryResponse;
+import br.com.ottonsam.toothy_planner_api.financial_manager.entities.ExpenseCategoryEntity;
 import br.com.ottonsam.toothy_planner_api.financial_manager.entities.ExpenseCycleEntity;
 import br.com.ottonsam.toothy_planner_api.financial_manager.entities.ExpenseEntity;
 import br.com.ottonsam.toothy_planner_api.financial_manager.entities.ExpenseType;
@@ -16,6 +19,10 @@ import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -85,7 +92,8 @@ public class ExpenseMetricsUseCase {
                 remainingDailyAmount,
                 installmentTotalFromReference(wallet.getId(), reference),
                 activeRecurringMonthlyTotal(wallet.getId()),
-                oneTimeTotal);
+                oneTimeTotal,
+                spendingByCategory(expenses, totalSpent));
     }
 
     BigDecimal activeRecurringMonthlyTotal(UUID walletId) {
@@ -110,6 +118,42 @@ public class ExpenseMetricsUseCase {
             return ZERO;
         }
         return remainingAmount.divide(BigDecimal.valueOf(days), 2, RoundingMode.HALF_UP);
+    }
+
+    private List<ExpenseSpendingByCategoryResponse> spendingByCategory(
+            List<ExpenseEntity> expenses, BigDecimal totalSpent) {
+        if (expenses.isEmpty()) {
+            return List.of();
+        }
+
+        var categories = new HashMap<UUID, ExpenseCategoryEntity>();
+        var totals = new HashMap<UUID, BigDecimal>();
+        for (var expense : expenses) {
+            var category = expense.getCategory();
+            categories.putIfAbsent(category.getId(), category);
+            totals.merge(category.getId(), expense.getAmount(), BigDecimal::add);
+        }
+
+        return totals.entrySet().stream()
+                .sorted(Comparator.<Map.Entry<UUID, BigDecimal>, BigDecimal>comparing(entry -> money(entry.getValue()))
+                        .reversed()
+                        .thenComparing(
+                                entry -> categories.get(entry.getKey()).getName(), String.CASE_INSENSITIVE_ORDER))
+                .map(entry -> {
+                    var categoryTotal = money(entry.getValue());
+                    return new ExpenseSpendingByCategoryResponse(
+                            ExpenseCategorySummaryResponse.from(categories.get(entry.getKey())),
+                            categoryTotal,
+                            percentage(categoryTotal, totalSpent));
+                })
+                .toList();
+    }
+
+    private BigDecimal percentage(BigDecimal categoryTotal, BigDecimal totalSpent) {
+        if (totalSpent.signum() == 0) {
+            return ZERO;
+        }
+        return categoryTotal.multiply(BigDecimal.valueOf(100)).divide(totalSpent, 2, RoundingMode.HALF_UP);
     }
 
     private BigDecimal sum(java.util.stream.Stream<BigDecimal> values) {
