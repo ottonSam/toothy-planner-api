@@ -4,6 +4,7 @@ import br.com.ottonsam.toothy_planner_api.auth.usecases.CurrentUserProvider;
 import br.com.ottonsam.toothy_planner_api.config.ApiException;
 import br.com.ottonsam.toothy_planner_api.diet.dtos.DietEntryRequest;
 import br.com.ottonsam.toothy_planner_api.diet.dtos.DietEntryResponse;
+import br.com.ottonsam.toothy_planner_api.diet.dtos.DietEntryUpdateRequest;
 import br.com.ottonsam.toothy_planner_api.diet.entities.DietEntryEntity;
 import br.com.ottonsam.toothy_planner_api.diet.entities.DietEntryUnit;
 import br.com.ottonsam.toothy_planner_api.diet.entities.FoodEntity;
@@ -69,6 +70,17 @@ public class DietEntryUseCase {
     public DietEntryResponse get(UUID entryId) {
         var user = currentUserProvider.get();
         return DietEntryResponse.from(findOwned(entryId, user.getId()));
+    }
+
+    public DietEntryResponse update(UUID entryId, DietEntryUpdateRequest request) {
+        var user = currentUserProvider.get();
+        var entry = findOwned(entryId, user.getId());
+        var quantity = requiredQuantity(request.quantity());
+        var unit = requiredUnit(request.unit());
+        var values = calculate(entry.getFood(), quantity, unit);
+        entry.updateQuantityAndUnit(
+                quantity, unit, values.kcal(), values.protein(), values.carbohydrate(), values.fat());
+        return DietEntryResponse.from(dietEntryRepository.save(entry));
     }
 
     public void delete(UUID entryId) {

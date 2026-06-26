@@ -1,0 +1,27 @@
+meta {
+  name: Update Entry
+  type: http
+  seq: 11
+}
+
+put {
+  url: {{baseUrl}}/api/v1/diet/entries/{{entryId}}
+  body: json
+  auth: none
+}
+
+vars:pre-request {
+  entryId: 00000000-0000-0000-0000-000000000000
+}
+
+body:json {
+  {
+    "quantity": 150.00,
+    "unit": "GRAMS"
+  }
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  Updates only quantity and unit. The API recalculates macros from the saved food values.
+}

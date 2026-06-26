@@ -2,6 +2,7 @@ package br.com.ottonsam.toothy_planner_api.diet.controllers;
 
 import br.com.ottonsam.toothy_planner_api.diet.dtos.DietEntryRequest;
 import br.com.ottonsam.toothy_planner_api.diet.dtos.DietEntryResponse;
+import br.com.ottonsam.toothy_planner_api.diet.dtos.DietEntryUpdateRequest;
 import br.com.ottonsam.toothy_planner_api.diet.dtos.DietGoalRequest;
 import br.com.ottonsam.toothy_planner_api.diet.dtos.DietGoalResponse;
 import br.com.ottonsam.toothy_planner_api.diet.dtos.DietMetricsResponse;
@@ -89,6 +90,11 @@ public class DietController {
     @GetMapping("/entries/{entryId}")
     DietEntryResponse getEntry(@PathVariable UUID entryId) {
         return dietEntryUseCase.get(entryId);
+    }
+
+    @PutMapping("/entries/{entryId}")
+    DietEntryResponse updateEntry(@PathVariable UUID entryId, @RequestBody DietEntryUpdateRequest request) {
+        return dietEntryUseCase.update(entryId, request);
     }
 
     @DeleteMapping("/entries/{entryId}")

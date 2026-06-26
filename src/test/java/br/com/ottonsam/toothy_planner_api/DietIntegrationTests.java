@@ -185,6 +185,68 @@ class DietIntegrationTests {
     }
 
     @Test
+    void editsEntryQuantityAndUnitRecalculatingMacrosWithoutDeepSeek() throws Exception {
+        var userCookie = login("diet-entry-edit@example.com");
+        var otherCookie = login("diet-entry-edit-other@example.com");
+        var entryId = createEntry(userCookie, "ovo", 1, "PORTIONS", "2026-07-13");
+        assertThat(foodNutritionAiClient.calls("OVO")).isEqualTo(1);
+
+        mockMvc.perform(put("/api/v1/diet/entries/{entryId}", entryId)
+                        .cookie(userCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("quantity", 100, "unit", "GRAMS"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.food.name").value("OVO"))
+                .andExpect(jsonPath("$.entryDate").value("2026-07-13"))
+                .andExpect(jsonPath("$.quantity").value(100.00))
+                .andExpect(jsonPath("$.unit").value("GRAMS"))
+                .andExpect(jsonPath("$.kcal").value(143.00))
+                .andExpect(jsonPath("$.protein").value(13.00))
+                .andExpect(jsonPath("$.carbohydrate").value(1.00))
+                .andExpect(jsonPath("$.fat").value(10.00));
+
+        mockMvc.perform(put("/api/v1/diet/entries/{entryId}", entryId)
+                        .cookie(userCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("quantity", 2, "unit", "PORTIONS"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.quantity").value(2.00))
+                .andExpect(jsonPath("$.unit").value("PORTIONS"))
+                .andExpect(jsonPath("$.kcal").value(136.00))
+                .andExpect(jsonPath("$.protein").value(12.00))
+                .andExpect(jsonPath("$.carbohydrate").value(1.00))
+                .andExpect(jsonPath("$.fat").value(10.00));
+
+        assertThat(foodNutritionAiClient.calls("OVO")).isEqualTo(1);
+
+        mockMvc.perform(get("/api/v1/diet/metrics?date=2026-07-13").cookie(userCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.consumed.kcal").value(136.00))
+                .andExpect(jsonPath("$.entries[0].id").value(entryId.toString()));
+
+        mockMvc.perform(put("/api/v1/diet/entries/{entryId}", entryId)
+                        .cookie(userCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("quantity", 0, "unit", "GRAMS"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Diet entry quantity must be greater than zero"));
+
+        mockMvc.perform(put("/api/v1/diet/entries/{entryId}", entryId)
+                        .cookie(userCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("quantity", 1))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Diet entry unit is required"));
+
+        mockMvc.perform(put("/api/v1/diet/entries/{entryId}", entryId)
+                        .cookie(otherCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("quantity", 1, "unit", "GRAMS"))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Diet entry not found"));
+    }
+
+    @Test
     void rejectsInvalidRequestsAndDoesNotSaveEntryWhenDeepSeekFails() throws Exception {
         var userCookie = login("diet-validation@example.com");
 

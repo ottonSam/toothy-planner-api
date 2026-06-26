@@ -42,7 +42,8 @@ Status mais comuns:
 2. Consulte alimentos por nome para preencher o autocomplete.
 3. Registre uma entrada usando o nome escolhido ou digitado.
 4. Consulte as metricas do dia.
-5. Use uma meta diaria quando uma data precisar fugir do padrao.
+5. Edite ou remova entradas quando precisar corrigir quantidade ou unidade.
+6. Use uma meta diaria quando uma data precisar fugir do padrao.
 
 O cliente nao cria alimentos diretamente. O primeiro registro de um nome novo
 faz a API consultar a DeepSeek e salvar os valores nutricionais.
@@ -358,12 +359,34 @@ Resposta: `200 OK` com `DietEntryResponse[]`.
 
 Resposta: `200 OK` com `DietEntryResponse`.
 
+### PUT /entries/{entryId}
+
+Edita a quantidade e a unidade de uma entrada existente.
+
+Request:
+
+```json
+{
+  "quantity": 150.00,
+  "unit": "GRAMS"
+}
+```
+
+Resposta: `200 OK` com `DietEntryResponse`.
+
+Regras:
+
+- A entrada deve pertencer ao usuario autenticado.
+- `quantity` deve ser maior que zero.
+- `unit` deve ser `GRAMS` ou `PORTIONS`.
+- O alimento e a data da entrada nao sao alterados.
+- Os valores de `kcal`, `protein`, `carbohydrate` e `fat` sao recalculados com
+  base nos dados nutricionais ja salvos do alimento.
+- A edicao nao consulta a DeepSeek e nao cria alimento novo.
+
 ### DELETE /entries/{entryId}
 
 Resposta: `204 No Content`.
-
-Nao existe endpoint para editar uma entrada. Para corrigir um registro, remova-o
-e crie outro.
 
 ## Endpoint de metricas
 
@@ -414,4 +437,3 @@ Diet goal fat must be greater than or equal to zero
 Invalid request body
 Invalid request parameter
 ```
-

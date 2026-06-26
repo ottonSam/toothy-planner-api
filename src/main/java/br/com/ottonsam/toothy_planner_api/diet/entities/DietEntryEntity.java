@@ -115,6 +115,28 @@ public class DietEntryEntity {
                 UUID.randomUUID(), food, user, entryDate, quantity, unit, kcal, protein, carbohydrate, fat);
     }
 
+    public void updateQuantityAndUnit(
+            BigDecimal quantity,
+            DietEntryUnit unit,
+            BigDecimal kcal,
+            BigDecimal protein,
+            BigDecimal carbohydrate,
+            BigDecimal fat) {
+        validateQuantity(quantity);
+        validateUnit(unit);
+        validateCalculated(kcal, "Diet entry kcal is required");
+        validateCalculated(protein, "Diet entry protein is required");
+        validateCalculated(carbohydrate, "Diet entry carbohydrate is required");
+        validateCalculated(fat, "Diet entry fat is required");
+        this.quantity = quantity;
+        this.unit = unit;
+        this.kcal = kcal;
+        this.protein = protein;
+        this.carbohydrate = carbohydrate;
+        this.fat = fat;
+        this.updatedAt = OffsetDateTime.now();
+    }
+
     private static void validateFood(FoodEntity food) {
         if (food == null) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Diet entry food is required");
