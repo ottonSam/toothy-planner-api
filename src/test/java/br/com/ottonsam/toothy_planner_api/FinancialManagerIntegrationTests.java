@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import br.com.ottonsam.toothy_planner_api.config.ApiException;
 import br.com.ottonsam.toothy_planner_api.financial_manager.entities.ExpenseCategory;
+import br.com.ottonsam.toothy_planner_api.financial_manager.usecases.ExpenseAudioTranscriptionClient;
 import br.com.ottonsam.toothy_planner_api.financial_manager.usecases.ExpenseTextAiClient;
 import br.com.ottonsam.toothy_planner_api.financial_manager.usecases.ExpenseTextClassification;
 import br.com.ottonsam.toothy_planner_api.financial_manager.usecases.ExpenseTextType;
@@ -29,6 +30,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.ArrayDeque;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -56,6 +58,7 @@ class FinancialManagerIntegrationTests {
     private final UserRepository userRepository;
     private final UserActivationCodeRepository activationCodeRepository;
     private final FakeExpenseTextAiClient expenseTextAiClient;
+    private final FakeExpenseAudioTranscriptionClient expenseAudioTranscriptionClient;
 
     @Autowired
     FinancialManagerIntegrationTests(
@@ -63,17 +66,20 @@ class FinancialManagerIntegrationTests {
             ObjectMapper objectMapper,
             UserRepository userRepository,
             UserActivationCodeRepository activationCodeRepository,
-            ExpenseTextAiClient expenseTextAiClient) {
+            ExpenseTextAiClient expenseTextAiClient,
+            ExpenseAudioTranscriptionClient expenseAudioTranscriptionClient) {
         this.mockMvc = mockMvc;
         this.objectMapper = objectMapper;
         this.userRepository = userRepository;
         this.activationCodeRepository = activationCodeRepository;
         this.expenseTextAiClient = (FakeExpenseTextAiClient) expenseTextAiClient;
+        this.expenseAudioTranscriptionClient = (FakeExpenseAudioTranscriptionClient) expenseAudioTranscriptionClient;
     }
 
     @BeforeEach
-    void resetAiClient() {
+    void resetAiClients() {
         expenseTextAiClient.reset();
+        expenseAudioTranscriptionClient.reset();
     }
 
     @Test
@@ -440,6 +446,231 @@ class FinancialManagerIntegrationTests {
     }
 
     @Test
+    void createsExpensesFromAudioUsingTranscriptionAndAiClassification() throws Exception {
+        var userCookie = login("financial-ai-audio@example.com");
+        var walletId = createWallet(userCookie, "Carteira IA audio", 2000, "2026-06-16", 15);
+
+        expenseAudioTranscriptionClient.enqueue("fui ao mercado e gastei 32 reais");
+        expenseTextAiClient.enqueue(new ExpenseTextClassification(
+                ExpenseTextType.ONE_TIME,
+                ExpenseCategory.ALIMENTACAO,
+                "Mercado",
+                BigDecimal.valueOf(32),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null));
+
+        var oneTimeResponse = mockMvc.perform(
+                        post("/api/v1/financial-manager/wallets/{walletId}/expenses/audio", walletId)
+                                .cookie(userCookie)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(json(Map.of(
+                                        "audioBase64", validAudioBase64(),
+                                        "contentType", "audio/webm;codecs=opus",
+                                        "referenceDate", "2026-07-12"))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.transcribedText").value("fui ao mercado e gastei 32 reais"))
+                .andExpect(jsonPath("$.classification.type").value("ONE_TIME"))
+                .andExpect(jsonPath("$.expense.category.key").value("ALIMENTACAO"))
+                .andExpect(jsonPath("$.expense.source").value("AI_AUDIO"))
+                .andExpect(jsonPath("$.expense.expenseDate").value("2026-07-12"))
+                .andReturn()
+                .getResponse();
+        var oneTimeExpenseId = readId(objectMapper
+                .readTree(oneTimeResponse.getContentAsString())
+                .get("expense")
+                .toString());
+
+        mockMvc.perform(put(
+                                "/api/v1/financial-manager/wallets/{walletId}/expenses/{expenseId}",
+                                walletId,
+                                oneTimeExpenseId)
+                        .cookie(userCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "category", "SAUDE",
+                                "description", "Farmacia editada",
+                                "amount", 45.00,
+                                "expenseDate", "2026-07-12"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.category.key").value("SAUDE"))
+                .andExpect(jsonPath("$.description").value("Farmacia editada"))
+                .andExpect(jsonPath("$.amount").value(45.00))
+                .andExpect(jsonPath("$.source").value("AI_AUDIO"));
+
+        expenseAudioTranscriptionClient.enqueue("comprei um notebook em 12 vezes de 199 reais");
+        expenseTextAiClient.enqueue(new ExpenseTextClassification(
+                ExpenseTextType.INSTALLMENT,
+                ExpenseCategory.COMPRAS,
+                "Notebook",
+                BigDecimal.valueOf(199),
+                null,
+                null,
+                null,
+                12,
+                null,
+                null));
+
+        mockMvc.perform(post("/api/v1/financial-manager/wallets/{walletId}/expenses/audio", walletId)
+                        .cookie(userCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "audioBase64", validAudioBase64(),
+                                "contentType", "audio/webm",
+                                "referenceDate", "2026-07-13"))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.classification.type").value("INSTALLMENT"))
+                .andExpect(jsonPath("$.installmentExpense.category.key").value("COMPRAS"))
+                .andExpect(jsonPath("$.generatedExpenses.length()").value(12))
+                .andExpect(jsonPath("$.generatedExpenses[0].source").value("AI_AUDIO"))
+                .andExpect(jsonPath("$.generatedExpenses[0].expenseDate").value("2026-07-13"));
+
+        expenseAudioTranscriptionClient.enqueue("contratei internet de 100 reais por mes");
+        expenseTextAiClient.enqueue(new ExpenseTextClassification(
+                ExpenseTextType.RECURRING,
+                ExpenseCategory.SERVICOS,
+                "Internet",
+                BigDecimal.valueOf(100),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null));
+
+        mockMvc.perform(post("/api/v1/financial-manager/wallets/{walletId}/expenses/audio", walletId)
+                        .cookie(userCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("audioBase64", validAudioBase64(), "contentType", "audio/ogg"))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.classification.type").value("RECURRING"))
+                .andExpect(jsonPath("$.recurringExpense.startsAt").value("2026-07-13"))
+                .andExpect(jsonPath("$.generatedExpenses[0].source").value("AI_AUDIO"));
+    }
+
+    @Test
+    void rejectsInvalidAudioRequestsBeforeTranscription() throws Exception {
+        var userCookie = login("financial-audio-validation@example.com");
+        var walletId = createWallet(userCookie, "Carteira validacao audio", 1000, "2026-06-16", 15);
+
+        mockMvc.perform(post("/api/v1/financial-manager/wallets/{walletId}/expenses/audio", walletId)
+                        .cookie(userCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("contentType", "audio/webm"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Audio content is required"));
+
+        mockMvc.perform(post("/api/v1/financial-manager/wallets/{walletId}/expenses/audio", walletId)
+                        .cookie(userCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("audioBase64", validAudioBase64()))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Audio content type is required"));
+
+        mockMvc.perform(post("/api/v1/financial-manager/wallets/{walletId}/expenses/audio", walletId)
+                        .cookie(userCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("audioBase64", "not-base64", "contentType", "audio/webm"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Audio content must be valid Base64"));
+
+        mockMvc.perform(post("/api/v1/financial-manager/wallets/{walletId}/expenses/audio", walletId)
+                        .cookie(userCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("audioBase64", validAudioBase64(), "contentType", "video/mp4"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Audio content type is not supported"));
+
+        mockMvc.perform(post("/api/v1/financial-manager/wallets/{walletId}/expenses/audio", walletId)
+                        .cookie(userCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("audioBase64", audioBase64("oversized"), "contentType", "audio/webm"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Audio content exceeds maximum size"));
+
+        assertThat(expenseAudioTranscriptionClient.calls()).isZero();
+    }
+
+    @Test
+    void doesNotSaveExpenseWhenAudioTranscriptionOrClassificationFails() throws Exception {
+        var userCookie = login("financial-audio-failures@example.com");
+        var walletId = createWallet(userCookie, "Carteira falhas audio", 1000, "2026-06-16", 15);
+
+        expenseAudioTranscriptionClient.enqueue(" ");
+        mockMvc.perform(post("/api/v1/financial-manager/wallets/{walletId}/expenses/audio", walletId)
+                        .cookie(userCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("audioBase64", validAudioBase64(), "contentType", "audio/webm"))))
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.message").value("Audio transcription returned empty text"));
+
+        expenseAudioTranscriptionClient.failNext();
+        mockMvc.perform(post("/api/v1/financial-manager/wallets/{walletId}/expenses/audio", walletId)
+                        .cookie(userCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("audioBase64", validAudioBase64(), "contentType", "audio/webm"))))
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.message").value("Audio transcription service is unavailable"));
+
+        expenseAudioTranscriptionClient.timeoutNext();
+        mockMvc.perform(post("/api/v1/financial-manager/wallets/{walletId}/expenses/audio", walletId)
+                        .cookie(userCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("audioBase64", validAudioBase64(), "contentType", "audio/webm"))))
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.message").value("Audio transcription timed out"));
+
+        expenseAudioTranscriptionClient.enqueue("gastei 50 reais");
+        expenseTextAiClient.failNext();
+        mockMvc.perform(post("/api/v1/financial-manager/wallets/{walletId}/expenses/audio", walletId)
+                        .cookie(userCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("audioBase64", validAudioBase64(), "contentType", "audio/webm"))))
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.message").value("DeepSeek expense classification failed: upstream unavailable"));
+
+        mockMvc.perform(get("/api/v1/financial-manager/wallets/{walletId}/expenses", walletId)
+                        .cookie(userCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isEmpty());
+    }
+
+    @Test
+    void preventsAudioExpenseCreationInAnotherUsersWallet() throws Exception {
+        var userCookie = login("financial-audio-owner@example.com");
+        var otherCookie = login("financial-audio-intruder@example.com");
+        var walletId = createWallet(userCookie, "Carteira privada audio", 1000, "2026-06-16", 15);
+
+        expenseAudioTranscriptionClient.enqueue("fui ao mercado e gastei 32 reais");
+        expenseTextAiClient.enqueue(new ExpenseTextClassification(
+                ExpenseTextType.ONE_TIME,
+                ExpenseCategory.ALIMENTACAO,
+                "Mercado",
+                BigDecimal.valueOf(32),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null));
+
+        mockMvc.perform(post("/api/v1/financial-manager/wallets/{walletId}/expenses/audio", walletId)
+                        .cookie(otherCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("audioBase64", validAudioBase64(), "contentType", "audio/webm"))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Wallet not found"));
+
+        mockMvc.perform(get("/api/v1/financial-manager/wallets/{walletId}/expenses", walletId)
+                        .cookie(userCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isEmpty());
+    }
+
+    @Test
     void rejectsInvalidRequestsAndDoesNotSaveWhenAiFails() throws Exception {
         var userCookie = login("financial-validation@example.com");
         var walletId = createWallet(userCookie, "Carteira validacoes", 1000, "2026-06-16", 15);
@@ -655,8 +886,61 @@ class FinancialManagerIntegrationTests {
         return UUID.fromString(jsonNode.get("id").asText());
     }
 
+    private String validAudioBase64() {
+        return audioBase64("audio");
+    }
+
+    private String audioBase64(String value) {
+        return Base64.getEncoder().encodeToString(value.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+
     private String json(Object value) throws Exception {
         return objectMapper.writeValueAsString(value);
+    }
+
+    static class FakeExpenseAudioTranscriptionClient implements ExpenseAudioTranscriptionClient {
+
+        private final ArrayDeque<String> transcriptions = new ArrayDeque<>();
+        private boolean failNext;
+        private boolean timeoutNext;
+        private int calls;
+
+        @Override
+        public String transcribe(String audioBase64, String contentType) {
+            calls++;
+            if (timeoutNext) {
+                timeoutNext = false;
+                throw new ApiException(HttpStatus.BAD_GATEWAY, "Audio transcription timed out");
+            }
+            if (failNext) {
+                failNext = false;
+                throw new ApiException(HttpStatus.BAD_GATEWAY, "Audio transcription service is unavailable");
+            }
+            return transcriptions.removeFirst();
+        }
+
+        void enqueue(String text) {
+            transcriptions.add(text);
+        }
+
+        void failNext() {
+            failNext = true;
+        }
+
+        void timeoutNext() {
+            timeoutNext = true;
+        }
+
+        int calls() {
+            return calls;
+        }
+
+        void reset() {
+            transcriptions.clear();
+            failNext = false;
+            timeoutNext = false;
+            calls = 0;
+        }
     }
 
     static class FakeExpenseTextAiClient implements ExpenseTextAiClient {
@@ -701,6 +985,12 @@ class FinancialManagerIntegrationTests {
         @Primary
         ExpenseTextAiClient expenseTextAiClient() {
             return new FakeExpenseTextAiClient();
+        }
+
+        @Bean
+        @Primary
+        ExpenseAudioTranscriptionClient expenseAudioTranscriptionClient() {
+            return new FakeExpenseAudioTranscriptionClient();
         }
 
         @Bean

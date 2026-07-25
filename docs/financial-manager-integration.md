@@ -63,7 +63,7 @@ Exemplo: carteira com `startsAt = 2026-07-28`.
 ### ExpenseSource
 
 ```json
-["MANUAL", "AI_TEXT"]
+["MANUAL", "AI_TEXT", "AI_AUDIO"]
 ```
 
 ## Categorias
@@ -229,6 +229,76 @@ Para textos parcelados, `installmentExpense` vem preenchido e
 `generatedExpenses` contem as parcelas criadas. Para textos recorrentes,
 `recurringExpense` vem preenchido e `generatedExpenses` contem as recorrencias
 geradas para ciclos existentes.
+
+## Criacao por audio
+
+### POST /wallets/{walletId}/expenses/audio
+
+```json
+{
+  "audioBase64": "AAAA...",
+  "contentType": "audio/webm",
+  "referenceDate": "2026-07-13"
+}
+```
+
+`audioBase64` deve conter o audio em Base64 dentro do JSON. O formato
+preferencial para web e `audio/webm` com codec Opus, mas a API aceita:
+
+- `audio/webm`
+- `audio/ogg`
+- `audio/wav`
+- `audio/mpeg`
+- `audio/mp4`
+
+`contentType` pode conter parametros do navegador, como
+`audio/webm;codecs=opus`; a API normaliza para o MIME type base.
+
+Fluxo:
+
+1. A API valida o Base64, o formato e o tamanho maximo configurado.
+2. O audio e enviado ao servico interno `audio-transcriber` via Docker.
+3. O texto transcrito e enviado ao mesmo fluxo DeepSeek usado por
+   `/expenses/text`.
+4. O gasto e criado diretamente como pontual, parcelado ou recorrente.
+
+Resposta:
+
+```json
+{
+  "transcribedText": "comprei um notebook parcelado em 12 vezes de 199 reais",
+  "classification": {
+    "type": "INSTALLMENT"
+  },
+  "expense": null,
+  "installmentExpense": {
+    "id": "e1e315d0-8268-49f6-8f58-7b150237cc55",
+    "walletId": "26697c4f-3eef-4821-a6d5-a1d09caa5ff8",
+    "description": "Notebook",
+    "installmentAmount": 199.00,
+    "installments": 12
+  },
+  "recurringExpense": null,
+  "generatedExpenses": []
+}
+```
+
+Gastos gerados por audio retornam `source = AI_AUDIO` e continuam editaveis
+pelas rotas manuais existentes.
+
+Erros esperados:
+
+- `400`: `Audio content is required`
+- `400`: `Audio content must be valid Base64`
+- `400`: `Audio content type is required`
+- `400`: `Audio content type is not supported`
+- `400`: `Audio content exceeds maximum size`
+- `502`: `Audio transcription returned empty text`
+- `502`: `Audio transcription timed out`
+- `502`: `Audio transcription service is unavailable`
+
+O audio nao e salvo em banco, arquivo local, storage externo ou logs. O arquivo
+temporario criado pelo servico de transcricao e removido apos o processamento.
 
 ## Parceladas
 

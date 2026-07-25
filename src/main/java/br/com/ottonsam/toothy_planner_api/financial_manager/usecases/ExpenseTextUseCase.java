@@ -47,31 +47,35 @@ public class ExpenseTextUseCase {
     }
 
     public ExpenseTextResponse create(UUID walletId, ExpenseTextRequest request) {
+        return create(walletId, request, ExpenseSource.AI_TEXT);
+    }
+
+    ExpenseTextResponse create(UUID walletId, ExpenseTextRequest request, ExpenseSource source) {
         var text = requiredText(request);
         var referenceDate = request.referenceDate() == null ? LocalDate.now(clock) : request.referenceDate();
         var classification = aiClient.classify(text, referenceDate);
         validateClassification(classification);
 
         return switch (classification.type()) {
-            case ONE_TIME -> createOneTime(walletId, classification, referenceDate);
-            case INSTALLMENT -> createInstallment(walletId, classification, referenceDate);
-            case RECURRING -> createRecurring(walletId, classification, referenceDate);
+            case ONE_TIME -> createOneTime(walletId, classification, referenceDate, source);
+            case INSTALLMENT -> createInstallment(walletId, classification, referenceDate, source);
+            case RECURRING -> createRecurring(walletId, classification, referenceDate, source);
         };
     }
 
     private ExpenseTextResponse createOneTime(
-            UUID walletId, ExpenseTextClassification classification, LocalDate referenceDate) {
+            UUID walletId, ExpenseTextClassification classification, LocalDate referenceDate, ExpenseSource source) {
         var expenseDate = classification.expenseDate() == null ? referenceDate : classification.expenseDate();
         var expense = expenseUseCase.create(
                 walletId,
                 new ExpenseRequest(
                         classification.category(), classification.description(), classification.amount(), expenseDate),
-                ExpenseSource.AI_TEXT);
+                source);
         return new ExpenseTextResponse(ExpenseTextType.ONE_TIME.name(), expense, null, null, List.of(expense));
     }
 
     private ExpenseTextResponse createInstallment(
-            UUID walletId, ExpenseTextClassification classification, LocalDate referenceDate) {
+            UUID walletId, ExpenseTextClassification classification, LocalDate referenceDate, ExpenseSource source) {
         var firstExpenseDate =
                 classification.firstExpenseDate() == null ? referenceDate : classification.firstExpenseDate();
         var installmentExpense = installmentExpenseUseCase.createEntity(
@@ -83,7 +87,7 @@ public class ExpenseTextUseCase {
                         installmentAmount(classification),
                         classification.installments(),
                         firstExpenseDate),
-                ExpenseSource.AI_TEXT);
+                source);
         var generatedExpenses =
                 expenseRepository
                         .findAllByParentExpenseIdOrderByExpenseDateAscCreatedAtAsc(installmentExpense.getId())
@@ -99,13 +103,13 @@ public class ExpenseTextUseCase {
     }
 
     private ExpenseTextResponse createRecurring(
-            UUID walletId, ExpenseTextClassification classification, LocalDate referenceDate) {
+            UUID walletId, ExpenseTextClassification classification, LocalDate referenceDate, ExpenseSource source) {
         var startsAt = classification.startsAt() == null ? referenceDate : classification.startsAt();
         var recurringExpense = recurringExpenseUseCase.createEntity(
                 walletId,
                 new RecurringExpenseRequest(
                         classification.category(), classification.description(), classification.amount(), startsAt),
-                ExpenseSource.AI_TEXT);
+                source);
         var generatedExpenses =
                 expenseRepository
                         .findAllByRecurrenceIdOrderByExpenseDateAscCreatedAtAsc(recurringExpense.getId())

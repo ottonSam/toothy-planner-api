@@ -1,6 +1,8 @@
 package br.com.ottonsam.toothy_planner_api.financial_manager.controllers;
 
 import br.com.ottonsam.toothy_planner_api.financial_manager.dtos.CancelRecurringExpenseRequest;
+import br.com.ottonsam.toothy_planner_api.financial_manager.dtos.ExpenseAudioRequest;
+import br.com.ottonsam.toothy_planner_api.financial_manager.dtos.ExpenseAudioResponse;
 import br.com.ottonsam.toothy_planner_api.financial_manager.dtos.ExpenseCategoryResponse;
 import br.com.ottonsam.toothy_planner_api.financial_manager.dtos.ExpenseCycleMetricsResponse;
 import br.com.ottonsam.toothy_planner_api.financial_manager.dtos.ExpenseCycleResponse;
@@ -15,6 +17,7 @@ import br.com.ottonsam.toothy_planner_api.financial_manager.dtos.InstallmentExpe
 import br.com.ottonsam.toothy_planner_api.financial_manager.dtos.InstallmentExpenseResponse;
 import br.com.ottonsam.toothy_planner_api.financial_manager.dtos.RecurringExpenseRequest;
 import br.com.ottonsam.toothy_planner_api.financial_manager.dtos.RecurringExpenseResponse;
+import br.com.ottonsam.toothy_planner_api.financial_manager.usecases.ExpenseAudioUseCase;
 import br.com.ottonsam.toothy_planner_api.financial_manager.usecases.ExpenseCategoryUseCase;
 import br.com.ottonsam.toothy_planner_api.financial_manager.usecases.ExpenseCycleUseCase;
 import br.com.ottonsam.toothy_planner_api.financial_manager.usecases.ExpenseMetricsUseCase;
@@ -46,6 +49,7 @@ public class FinancialManagerController {
     private final ExpenseMetricsUseCase metricsUseCase;
     private final ExpenseUseCase expenseUseCase;
     private final ExpenseTextUseCase expenseTextUseCase;
+    private final ExpenseAudioUseCase expenseAudioUseCase;
     private final InstallmentExpenseUseCase installmentExpenseUseCase;
     private final RecurringExpenseUseCase recurringExpenseUseCase;
 
@@ -56,6 +60,7 @@ public class FinancialManagerController {
             ExpenseMetricsUseCase metricsUseCase,
             ExpenseUseCase expenseUseCase,
             ExpenseTextUseCase expenseTextUseCase,
+            ExpenseAudioUseCase expenseAudioUseCase,
             InstallmentExpenseUseCase installmentExpenseUseCase,
             RecurringExpenseUseCase recurringExpenseUseCase) {
         this.categoryUseCase = categoryUseCase;
@@ -64,6 +69,7 @@ public class FinancialManagerController {
         this.metricsUseCase = metricsUseCase;
         this.expenseUseCase = expenseUseCase;
         this.expenseTextUseCase = expenseTextUseCase;
+        this.expenseAudioUseCase = expenseAudioUseCase;
         this.installmentExpenseUseCase = installmentExpenseUseCase;
         this.recurringExpenseUseCase = recurringExpenseUseCase;
     }
@@ -133,6 +139,12 @@ public class FinancialManagerController {
     ResponseEntity<ExpenseTextResponse> createExpenseFromText(
             @PathVariable UUID walletId, @RequestBody ExpenseTextRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(expenseTextUseCase.create(walletId, request));
+    }
+
+    @PostMapping("/wallets/{walletId}/expenses/audio")
+    ResponseEntity<ExpenseAudioResponse> createExpenseFromAudio(
+            @PathVariable UUID walletId, @RequestBody ExpenseAudioRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(expenseAudioUseCase.create(walletId, request));
     }
 
     @GetMapping("/wallets/{walletId}/expenses")
