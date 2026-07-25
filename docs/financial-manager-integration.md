@@ -1,54 +1,58 @@
 # Financial Manager - Guia de integracao
 
-Documento de contrato para integracao com o modulo financeiro da Toothy Planner
-API.
+Contrato de integracao do modulo financeiro da Toothy Planner API.
 
-## Base e autenticacao
+## Base
 
 - Base local: `http://localhost:8080`
-- Prefixo do modulo: `/api/v1/financial-manager`
+- Prefixo: `/api/v1/financial-manager`
 - Formato: `application/json`
-- Datas: `YYYY-MM-DD`
-- Datas com horario: ISO-8601 com offset
-- IDs: UUID em string
 - Autenticacao: cookie HTTP-only `access_token`
+- Datas: `YYYY-MM-DD`
 
-Todas as rotas deste documento exigem autenticacao. Em clientes web, envie as
-requisicoes com credenciais:
+Todas as rotas exigem autenticacao.
 
-```ts
-fetch(url, {
-  credentials: "include"
-});
-```
+## Conceitos
 
-Erros usam o formato:
+Categorias sao globais e fixas. O frontend deve usar `GET /categories` para
+preencher seletores, mas nao pode criar, editar ou excluir categorias.
 
-```json
-{
-  "message": "Wallet not found"
-}
-```
+Carteiras agrupam ciclos e gastos. Cada carteira tem:
 
-Status mais comuns:
+- `startsAt`: data inicial da primeira janela de ciclo.
+- `targetSpendingDay`: dia alvo para consumir a meta mensal.
+- `spendingGoal`: meta de gasto do ciclo.
 
-- `400 Bad Request`: campo obrigatorio ausente ou regra invalida.
-- `401 Unauthorized`: cookie ausente, expirado ou invalido.
-- `404 Not Found`: recurso inexistente ou pertencente a outro usuario.
-- `409 Conflict`: nome duplicado ou exclusao bloqueada por relacionamentos.
+Ciclos nao possuem rota de criacao. Eles sao criados automaticamente quando um
+gasto, parcela ou recorrencia e registrado para uma data da carteira.
 
-## Fluxo recomendado
+Exemplo: carteira com `startsAt = 2026-07-28`.
 
-1. Crie as categorias.
-2. Crie uma carteira com meta e dia de encerramento.
-3. Registre gastos pontuais, parcelados ou recorrentes.
-4. Liste os ciclos criados automaticamente.
-5. Consulte as metricas da carteira ou de um ciclo.
-
-Nao existe endpoint para criar ciclos. Eles sao criados automaticamente ao
-registrar gastos, parcelas ou recorrencias.
+- O primeiro ciclo vai de `2026-07-28` ate `2026-08-27`.
+- Um gasto em `2026-08-27` fica no ciclo de agosto.
+- Um gasto em `2026-08-28` fica no ciclo de setembro.
+- Se `targetSpendingDay = 10`, `remainingDailyAmount` considera os dias ate
+  `2026-08-10` no ciclo de agosto.
 
 ## Enums
+
+### ExpenseCategory
+
+```json
+[
+  "ALIMENTACAO",
+  "MORADIA",
+  "TRANSPORTE",
+  "SAUDE",
+  "EDUCACAO",
+  "LAZER",
+  "SERVICOS",
+  "COMPRAS",
+  "TRABALHO",
+  "PETS",
+  "OUTROS"
+]
+```
 
 ### ExpenseType
 
@@ -56,549 +60,239 @@ registrar gastos, parcelas ou recorrencias.
 ["ONE_TIME", "INSTALLMENT", "RECURRING"]
 ```
 
-O tipo nao e enviado pelo cliente:
+### ExpenseSource
 
-- `ONE_TIME`: criado por `/expenses`.
-- `INSTALLMENT`: gerado por `/installment-expenses`.
-- `RECURRING`: gerado por `/recurring-expenses`.
+```json
+["MANUAL", "AI_TEXT"]
+```
 
-## Respostas reutilizaveis
+## Categorias
 
-### ExpenseCategoryResponse
+### GET /categories
+
+Retorna categorias fixas com metadados para UI.
+
+```json
+[
+  {
+    "key": "ALIMENTACAO",
+    "name": "Alimentacao",
+    "color": "#16A34A",
+    "icon": "utensils",
+    "description": "Mercado, restaurantes, delivery e alimentos"
+  }
+]
+```
+
+## Carteiras
+
+### POST /wallets
 
 ```json
 {
-  "id": "190e5224-d8f7-4df8-8a6f-2aa38efcf8ad",
-  "name": "Alimentacao",
-  "color": "#F97316",
-  "icon": "utensils",
-  "createdAt": "2026-07-13T09:00:00-03:00",
-  "updatedAt": "2026-07-13T09:00:00-03:00"
+  "description": "Carteira pessoal",
+  "spendingGoal": 3000.00,
+  "startsAt": "2026-07-28",
+  "targetSpendingDay": 10
 }
 ```
 
-### ExpenseCategorySummaryResponse
-
-Usada dentro de gastos, parcelamentos e recorrencias.
-
-```json
-{
-  "id": "190e5224-d8f7-4df8-8a6f-2aa38efcf8ad",
-  "name": "Alimentacao",
-  "color": "#F97316",
-  "icon": "utensils"
-}
-```
-
-### ExpenseWalletResponse
+Resposta:
 
 ```json
 {
   "id": "26697c4f-3eef-4821-a6d5-a1d09caa5ff8",
   "description": "Carteira pessoal",
   "spendingGoal": 3000.00,
-  "cycleEndDay": 15,
+  "startsAt": "2026-07-28",
+  "targetSpendingDay": 10,
   "createdAt": "2026-07-13T09:00:00-03:00",
   "updatedAt": "2026-07-13T09:00:00-03:00"
 }
 ```
 
-### ExpenseCycleResponse
+Rotas:
+
+- `GET /wallets`
+- `GET /wallets/{walletId}`
+- `PUT /wallets/{walletId}`
+- `DELETE /wallets/{walletId}`
+- `GET /wallets/{walletId}/metrics`
+
+`description` deve ser unica por usuario.
+
+## Ciclos
+
+Rotas:
+
+- `GET /wallets/{walletId}/cycles`
+- `GET /wallets/{walletId}/cycles/{cycleId}`
+- `GET /wallets/{walletId}/cycles/{cycleId}/metrics`
+- `GET /wallets/{walletId}/cycles/{cycleId}/expenses`
+
+Resposta de ciclo:
 
 ```json
 {
   "id": "3a354849-f809-40b8-805d-fb784de471ef",
   "walletId": "26697c4f-3eef-4821-a6d5-a1d09caa5ff8",
-  "referenceMonth": 7,
+  "referenceMonth": 8,
   "referenceYear": 2026,
-  "startsAt": "2026-06-16",
-  "endsAt": "2026-07-15",
+  "startsAt": "2026-07-28",
+  "endsAt": "2026-08-27",
+  "targetSpendingDate": "2026-08-10",
   "createdAt": "2026-07-13T09:00:00-03:00",
   "updatedAt": "2026-07-13T09:00:00-03:00"
 }
 ```
 
-O mes de referencia e o mes no qual o ciclo termina. Para uma carteira com
-`cycleEndDay = 15`:
+## Gastos pontuais
 
-- `2026-07-13` pertence ao ciclo de julho.
-- `2026-07-16` pertence ao ciclo de agosto.
-- O ciclo de julho vai de `2026-06-16` ate `2026-07-15`.
-
-Se o dia configurado nao existir no mes, o ultimo dia do mes e usado.
-
-### ExpenseResponse
+### POST /wallets/{walletId}/expenses
 
 ```json
 {
-  "id": "93288efd-a6d5-4a25-ac6c-c115551ffe8c",
-  "walletId": "26697c4f-3eef-4821-a6d5-a1d09caa5ff8",
-  "cycleId": "3a354849-f809-40b8-805d-fb784de471ef",
-  "category": {
-    "id": "190e5224-d8f7-4df8-8a6f-2aa38efcf8ad",
-    "name": "Alimentacao",
-    "color": "#F97316",
-    "icon": "utensils"
-  },
+  "category": "ALIMENTACAO",
   "description": "Mercado",
   "amount": 250.90,
-  "expenseDate": "2026-07-13",
+  "expenseDate": "2026-08-09"
+}
+```
+
+Gastos podem ser listados, consultados, editados e excluidos:
+
+- `GET /wallets/{walletId}/expenses`
+- `GET /wallets/{walletId}/expenses/{expenseId}`
+- `PUT /wallets/{walletId}/expenses/{expenseId}`
+- `DELETE /wallets/{walletId}/expenses/{expenseId}`
+
+A edicao manual permite alterar `category`, `description`, `amount` e
+`expenseDate`.
+
+## Criacao por texto
+
+### POST /wallets/{walletId}/expenses/text
+
+```json
+{
+  "text": "fui ao mercado e gastei 32 reais",
+  "referenceDate": "2026-07-13"
+}
+```
+
+`referenceDate` e opcional. Quando omitido, a API usa a data atual.
+
+A API chama DeepSeek, classifica categoria e tipo de gasto, cria o registro sem
+pre-confirmacao e retorna o que foi criado.
+
+Resposta para gasto pontual:
+
+```json
+{
   "type": "ONE_TIME",
-  "parentExpenseId": null,
-  "installmentNumber": null,
-  "installmentTotal": null,
-  "recurrenceId": null,
-  "createdAt": "2026-07-13T09:00:00-03:00",
-  "updatedAt": "2026-07-13T09:00:00-03:00"
-}
-```
-
-Campos condicionais:
-
-- `INSTALLMENT`: possui `parentExpenseId`, `installmentNumber` e
-  `installmentTotal`.
-- `RECURRING`: possui `recurrenceId`.
-- `ONE_TIME`: esses campos sao `null`.
-
-### InstallmentExpenseResponse
-
-```json
-{
-  "id": "e1e315d0-8268-49f6-8f58-7b150237cc55",
-  "walletId": "26697c4f-3eef-4821-a6d5-a1d09caa5ff8",
-  "category": {
-    "id": "190e5224-d8f7-4df8-8a6f-2aa38efcf8ad",
-    "name": "Alimentacao",
-    "color": "#F97316",
-    "icon": "utensils"
+  "expense": {
+    "id": "93288efd-a6d5-4a25-ac6c-c115551ffe8c",
+    "category": {
+      "key": "ALIMENTACAO",
+      "name": "Alimentacao",
+      "color": "#16A34A",
+      "icon": "utensils"
+    },
+    "description": "Mercado",
+    "amount": 32.00,
+    "expenseDate": "2026-07-13",
+    "type": "ONE_TIME",
+    "source": "AI_TEXT"
   },
-  "description": "Notebook",
-  "totalAmount": 3500.00,
-  "installmentAmount": null,
-  "installments": 10,
-  "firstExpenseDate": "2026-07-16",
-  "createdAt": "2026-07-13T09:00:00-03:00",
-  "updatedAt": "2026-07-13T09:00:00-03:00"
-}
-```
-
-Quando a criacao usa `installmentAmount`, `totalAmount` e retornado como `null`.
-Quando usa `totalAmount`, `installmentAmount` e retornado como `null`. O valor
-calculado das parcelas deve ser obtido na listagem de gastos.
-
-### RecurringExpenseResponse
-
-```json
-{
-  "id": "ac895448-5d75-4ee3-a8c5-a19c98f0322d",
-  "walletId": "26697c4f-3eef-4821-a6d5-a1d09caa5ff8",
-  "category": {
-    "id": "190e5224-d8f7-4df8-8a6f-2aa38efcf8ad",
-    "name": "Servicos",
-    "color": "#0EA5E9",
-    "icon": "wifi"
-  },
-  "description": "Internet",
-  "amount": 99.90,
-  "startsAt": "2026-07-13",
-  "canceledAt": null,
-  "active": true,
-  "createdAt": "2026-07-13T09:00:00-03:00",
-  "updatedAt": "2026-07-13T09:00:00-03:00"
-}
-```
-
-### ExpenseCycleMetricsResponse
-
-```json
-{
-  "walletId": "26697c4f-3eef-4821-a6d5-a1d09caa5ff8",
-  "cycleId": "3a354849-f809-40b8-805d-fb784de471ef",
-  "referenceMonth": 7,
-  "referenceYear": 2026,
-  "startsAt": "2026-06-16",
-  "endsAt": "2026-07-15",
-  "spendingGoal": 3000.00,
-  "totalSpent": 250.90,
-  "remainingAmount": 2749.10,
-  "remainingDailyAmount": 916.37,
-  "installmentTotalFromCurrentCycle": 0.00,
-  "recurringMonthlyTotal": 0.00,
-  "oneTimeTotal": 250.90,
-  "spendingByCategory": [
+  "installmentExpense": null,
+  "recurringExpense": null,
+  "generatedExpenses": [
     {
+      "id": "93288efd-a6d5-4a25-ac6c-c115551ffe8c",
       "category": {
-        "id": "190e5224-d8f7-4df8-8a6f-2aa38efcf8ad",
+        "key": "ALIMENTACAO",
         "name": "Alimentacao",
-        "color": "#F97316",
+        "color": "#16A34A",
         "icon": "utensils"
       },
-      "totalSpent": 150.90,
-      "percentage": 60.14
-    },
-    {
-      "category": {
-        "id": "59a4eef4-9146-4cb8-8403-b2e111b758ed",
-        "name": "Transporte",
-        "color": "#0EA5E9",
-        "icon": "car"
-      },
-      "totalSpent": 100.00,
-      "percentage": 39.86
+      "description": "Mercado",
+      "amount": 32.00,
+      "expenseDate": "2026-07-13",
+      "type": "ONE_TIME",
+      "source": "AI_TEXT"
     }
   ]
 }
 ```
 
-Calculos:
-
-- `totalSpent`: soma de todos os gastos do ciclo.
-- `remainingAmount`: `spendingGoal - totalSpent`.
-- `remainingDailyAmount`: saldo dividido pelos dias restantes, incluindo o dia
-  atual e o dia final. Para ciclo encerrado, retorna `0.00`.
-- `installmentTotalFromCurrentCycle`: soma das parcelas do ciclo consultado em
-  diante.
-- `recurringMonthlyTotal`: soma das recorrencias atualmente ativas.
-- `oneTimeTotal`: soma dos gastos `ONE_TIME` do ciclo.
-- `spendingByCategory`: lista para grafico de barras com categoria, total gasto
-  no ciclo e porcentagem da categoria sobre `totalSpent`.
-
-Regras de `spendingByCategory`:
-
-- Considera todos os tipos de gasto do ciclo: `ONE_TIME`, `INSTALLMENT` e
-  `RECURRING`.
-- Categorias sem gastos no ciclo nao aparecem.
-- Ciclos sem gastos retornam `[]`.
-- `percentage` e calculado como `totalSpent da categoria / totalSpent do ciclo
-  * 100`.
-- `percentage` e arredondado para duas casas decimais com `HALF_UP`.
-- A lista e ordenada por maior `totalSpent`; em empate, por nome da categoria.
-
-Os saldos podem ser negativos quando a meta for ultrapassada.
-
-### ExpenseWalletMetricsResponse
-
-```json
-{
-  "walletId": "26697c4f-3eef-4821-a6d5-a1d09caa5ff8",
-  "description": "Carteira pessoal",
-  "spendingGoal": 3000.00,
-  "cycleEndDay": 15,
-  "currentCycle": {
-    "id": "3a354849-f809-40b8-805d-fb784de471ef",
-    "walletId": "26697c4f-3eef-4821-a6d5-a1d09caa5ff8",
-    "referenceMonth": 7,
-    "referenceYear": 2026,
-    "startsAt": "2026-06-16",
-    "endsAt": "2026-07-15",
-    "createdAt": "2026-07-13T09:00:00-03:00",
-    "updatedAt": "2026-07-13T09:00:00-03:00"
-  },
-  "currentCycleMetrics": {
-    "walletId": "26697c4f-3eef-4821-a6d5-a1d09caa5ff8",
-    "cycleId": "3a354849-f809-40b8-805d-fb784de471ef",
-    "referenceMonth": 7,
-    "referenceYear": 2026,
-    "startsAt": "2026-06-16",
-    "endsAt": "2026-07-15",
-    "spendingGoal": 3000.00,
-    "totalSpent": 250.90,
-    "remainingAmount": 2749.10,
-    "remainingDailyAmount": 916.37,
-    "installmentTotalFromCurrentCycle": 0.00,
-    "recurringMonthlyTotal": 0.00,
-    "oneTimeTotal": 250.90
-  },
-  "activeRecurringMonthlyTotal": 0.00,
-  "installmentTotalFromCurrentCycle": 0.00
-}
-```
-
-Se ainda nao existir um ciclo persistido para a data atual, `currentCycle` e
-`currentCycleMetrics` retornam `null`. Consultar metricas nao cria o ciclo.
-
-## Endpoints de categorias
-
-### POST /categories
-
-Cria uma categoria.
-
-Request:
-
-```json
-{
-  "name": "Alimentacao",
-  "color": "#F97316",
-  "icon": "utensils"
-}
-```
-
-Resposta: `201 Created` com `ExpenseCategoryResponse`.
-
-Validacoes:
-
-- Todos os campos sao obrigatorios e nao podem estar em branco.
-- `name` e unico por usuario, ignorando maiusculas e minusculas.
-
-### GET /categories
-
-Resposta: `200 OK` com `ExpenseCategoryResponse[]`, ordenado por criacao.
-
-### GET /categories/{categoryId}
-
-Resposta: `200 OK` com `ExpenseCategoryResponse`.
-
-### PUT /categories/{categoryId}
-
-Usa o mesmo payload de criacao.
-
-Resposta: `200 OK` com `ExpenseCategoryResponse`.
-
-### DELETE /categories/{categoryId}
-
-Resposta: `204 No Content`.
-
-Retorna `409 Conflict` se a categoria estiver ligada a um gasto, parcelamento
-ou recorrencia.
-
-## Endpoints de carteiras
-
-### POST /wallets
-
-Request:
-
-```json
-{
-  "description": "Carteira pessoal",
-  "spendingGoal": 3000.00,
-  "cycleEndDay": 15
-}
-```
-
-Resposta: `201 Created` com `ExpenseWalletResponse`.
-
-Validacoes:
-
-- `description` e obrigatoria e unica por usuario, ignorando caixa.
-- `spendingGoal` deve ser maior que zero.
-- `cycleEndDay` deve estar entre `1` e `31`.
-
-### GET /wallets
-
-Resposta: `200 OK` com `ExpenseWalletResponse[]`, ordenado por criacao.
-
-### GET /wallets/{walletId}
-
-Resposta: `200 OK` com `ExpenseWalletResponse`.
-
-### PUT /wallets/{walletId}
-
-Usa o mesmo payload de criacao.
-
-Resposta: `200 OK` com `ExpenseWalletResponse`.
-
-Nota de integracao: a implementacao atual atualiza o `cycleEndDay` usado em
-novos calculos, mas nao recalcula as datas de ciclos ja persistidos.
-
-### DELETE /wallets/{walletId}
-
-Resposta: `204 No Content`.
-
-Retorna `409 Conflict` se houver ciclos, gastos, parcelamentos ou recorrencias.
-
-### GET /wallets/{walletId}/metrics
-
-Resposta: `200 OK` com `ExpenseWalletMetricsResponse`.
-
-## Endpoints de ciclos
-
-### GET /wallets/{walletId}/cycles
-
-Resposta: `200 OK` com `ExpenseCycleResponse[]`, ordenado por ano e mes.
-
-### GET /wallets/{walletId}/cycles/{cycleId}
-
-Resposta: `200 OK` com `ExpenseCycleResponse`.
-
-### GET /wallets/{walletId}/cycles/{cycleId}/metrics
-
-Resposta: `200 OK` com `ExpenseCycleMetricsResponse`.
-
-### GET /wallets/{walletId}/cycles/{cycleId}/expenses
-
-Resposta: `200 OK` com `ExpenseResponse[]`.
-
-Retorna somente os gastos associados ao ciclo informado, incluindo os tipos
-`ONE_TIME`, `INSTALLMENT` e `RECURRING`. A lista e ordenada por `expenseDate` e
-depois por `createdAt`. Um ciclo sem gastos retorna `[]`.
-
-Nao existe `POST`, `PUT` ou `DELETE` de ciclo.
-
-## Endpoints de gastos
-
-### POST /wallets/{walletId}/expenses
-
-Cria um gasto pontual.
-
-Request:
-
-```json
-{
-  "categoryId": "190e5224-d8f7-4df8-8a6f-2aa38efcf8ad",
-  "description": "Mercado",
-  "amount": 250.90,
-  "expenseDate": "2026-07-13"
-}
-```
-
-Resposta: `201 Created` com `ExpenseResponse` e `type = "ONE_TIME"`.
-
-O cliente nao envia `cycleId`. O ciclo e encontrado ou criado a partir de
-`expenseDate`.
-
-### GET /wallets/{walletId}/expenses
-
-Resposta: `200 OK` com `ExpenseResponse[]`.
-
-A lista contem todos os tipos de gasto e e ordenada por `expenseDate` e
-`createdAt`.
-
-### GET /wallets/{walletId}/expenses/{expenseId}
-
-Resposta: `200 OK` com `ExpenseResponse`.
-
-### PUT /wallets/{walletId}/expenses/{expenseId}
-
-Usa o mesmo payload de criacao. Se `expenseDate` mudar, o ciclo e recalculado.
-
-Resposta: `200 OK` com `ExpenseResponse`.
-
-Para alterar parcelas ou recorrencias futuras em lote, prefira os endpoints dos
-recursos pai.
-
-### DELETE /wallets/{walletId}/expenses/{expenseId}
-
-Resposta: `204 No Content`.
-
-Para `ONE_TIME` e `INSTALLMENT`, remove somente o gasto informado.
-
-Para `RECURRING`, remove a ocorrencia selecionada e todas as ocorrencias
-posteriores com o mesmo `recurrenceId`. A recorrencia pai e marcada como
-cancelada no inicio do ciclo selecionado, impedindo novas geracoes. Ocorrencias
-de ciclos anteriores e outras recorrencias sao preservadas.
-
-Esse comportamento difere do endpoint `/recurring-expenses/{id}/cancel`: o
-cancelamento preserva a ocorrencia do ciclo selecionado e remove somente as
-posteriores.
-
-## Endpoints de parcelamentos
+Para textos parcelados, `installmentExpense` vem preenchido e
+`generatedExpenses` contem as parcelas criadas. Para textos recorrentes,
+`recurringExpense` vem preenchido e `generatedExpenses` contem as recorrencias
+geradas para ciclos existentes.
+
+## Parceladas
 
 ### POST /wallets/{walletId}/installment-expenses
 
-O cliente deve enviar exatamente uma forma de valor.
-
-Por valor total:
+Com valor total:
 
 ```json
 {
-  "categoryId": "190e5224-d8f7-4df8-8a6f-2aa38efcf8ad",
+  "category": "COMPRAS",
   "description": "Notebook",
   "totalAmount": 3500.00,
   "installments": 10,
-  "firstExpenseDate": "2026-07-16"
+  "firstExpenseDate": "2026-08-09"
 }
 ```
 
-Por valor da parcela:
+Com valor da parcela:
 
 ```json
 {
-  "categoryId": "190e5224-d8f7-4df8-8a6f-2aa38efcf8ad",
-  "description": "Academia",
-  "installmentAmount": 120.00,
+  "category": "COMPRAS",
+  "description": "Celular",
+  "installmentAmount": 199.00,
   "installments": 12,
-  "firstExpenseDate": "2026-07-13"
+  "firstExpenseDate": "2026-08-09"
 }
 ```
 
-Resposta: `201 Created` com `InstallmentExpenseResponse`.
+A API aceita `totalAmount` ou `installmentAmount`, nunca ambos. Quando usa
+`totalAmount`, divide pelo numero de parcelas com arredondamento para cima nos
+centavos.
 
-Regras:
+Rotas:
 
-- `installments` deve ser maior que zero.
-- Valores devem ser maiores que zero.
-- Nao envie `totalAmount` e `installmentAmount` juntos.
-- Com `totalAmount`, cada parcela e calculada com arredondamento para cima em
-  duas casas. Exemplo: `100 / 3` gera tres parcelas de `33.34`.
-- Cada parcela vira um `ExpenseResponse` com `type = "INSTALLMENT"`.
-- O `parentExpenseId` de cada parcela e o ID do parcelamento.
-- Os ciclos futuros sao criados automaticamente.
+- `GET /wallets/{walletId}/installment-expenses`
+- `GET /wallets/{walletId}/installment-expenses/{installmentExpenseId}`
+- `PUT /wallets/{walletId}/installment-expenses/{installmentExpenseId}`
+- `DELETE /wallets/{walletId}/installment-expenses/{installmentExpenseId}`
 
-### GET /wallets/{walletId}/installment-expenses
+Parcelas geradas possuem `type = INSTALLMENT` e `parentExpenseId` com o id do
+registro pai.
 
-Resposta: `200 OK` com `InstallmentExpenseResponse[]`.
-
-### GET /wallets/{walletId}/installment-expenses/{installmentExpenseId}
-
-Resposta: `200 OK` com `InstallmentExpenseResponse`.
-
-### PUT /wallets/{walletId}/installment-expenses/{installmentExpenseId}
-
-Usa o mesmo formato de criacao.
-
-Resposta: `200 OK` com `InstallmentExpenseResponse`.
-
-A atualizacao remove e recria as parcelas cujos ciclos terminam na data atual
-ou depois dela. Parcelas de ciclos encerrados sao preservadas.
-
-### DELETE /wallets/{walletId}/installment-expenses/{installmentExpenseId}
-
-Resposta: `204 No Content`.
-
-Remove o parcelamento e todas as parcelas associadas, inclusive historicas.
-
-## Endpoints de recorrencias
+## Recorrentes
 
 ### POST /wallets/{walletId}/recurring-expenses
 
-Request:
-
 ```json
 {
-  "categoryId": "190e5224-d8f7-4df8-8a6f-2aa38efcf8ad",
+  "category": "SERVICOS",
   "description": "Internet",
   "amount": 99.90,
-  "startsAt": "2026-07-13"
+  "startsAt": "2026-08-06"
 }
 ```
 
-Resposta: `201 Created` com `RecurringExpenseResponse`.
+Rotas:
 
-A recorrencia gera um gasto no ciclo inicial e nos ciclos posteriores ja
-existentes. Novos ciclos criados futuramente tambem recebem o gasto.
+- `GET /wallets/{walletId}/recurring-expenses`
+- `GET /wallets/{walletId}/recurring-expenses/{recurringExpenseId}`
+- `PUT /wallets/{walletId}/recurring-expenses/{recurringExpenseId}`
+- `POST /wallets/{walletId}/recurring-expenses/{recurringExpenseId}/cancel`
 
-### GET /wallets/{walletId}/recurring-expenses
-
-Resposta: `200 OK` com `RecurringExpenseResponse[]`.
-
-A lista inclui recorrencias ativas e canceladas.
-
-### GET /wallets/{walletId}/recurring-expenses/{recurringExpenseId}
-
-Resposta: `200 OK` com `RecurringExpenseResponse`.
-
-### PUT /wallets/{walletId}/recurring-expenses/{recurringExpenseId}
-
-Usa o mesmo payload de criacao.
-
-Resposta: `200 OK` com `RecurringExpenseResponse`.
-
-Somente recorrencias ativas podem ser alteradas. Gastos de ciclos que terminam
-na data atual ou depois dela sao removidos e recriados com os novos dados.
-
-### POST /wallets/{walletId}/recurring-expenses/{recurringExpenseId}/cancel
-
-Request:
+Cancelamento:
 
 ```json
 {
@@ -606,27 +300,47 @@ Request:
 }
 ```
 
-Resposta: `200 OK` com `RecurringExpenseResponse`, `active = false` e
-`canceledAt` igual ao inicio do ciclo selecionado.
+Ao excluir uma ocorrencia recorrente pelo endpoint de gastos, a recorrencia pai
+e cancelada a partir daquele ciclo e todas as ocorrencias daquele ciclo em
+diante sao removidas.
 
-O gasto recorrente do ciclo selecionado e preservado. Gastos da mesma
-recorrencia em ciclos posteriores sao removidos.
+## Metricas
 
-Nao existe endpoint de exclusao definitiva de recorrencia.
+`ExpenseCycleMetricsResponse`:
 
-## Erros relevantes
-
-```text
-Category name already exists
-Category is associated with expenses
-Wallet description already exists
-Wallet is associated with cycles or expenses
-Inform either total amount or installment amount, but not both
-Recurring expense is canceled
-Category not found
-Wallet not found
-Cycle not found
-Expense not found
-Installment expense not found
-Recurring expense not found
+```json
+{
+  "walletId": "26697c4f-3eef-4821-a6d5-a1d09caa5ff8",
+  "cycleId": "3a354849-f809-40b8-805d-fb784de471ef",
+  "referenceMonth": 8,
+  "referenceYear": 2026,
+  "startsAt": "2026-07-28",
+  "endsAt": "2026-08-27",
+  "targetSpendingDate": "2026-08-10",
+  "spendingGoal": 3000.00,
+  "totalSpent": 250.90,
+  "remainingAmount": 2749.10,
+  "remainingDailyAmount": 211.47,
+  "spentUntilTargetDate": 250.90,
+  "spentAfterTargetDate": 0.00,
+  "installmentTotalFromCurrentCycle": 0.00,
+  "recurringMonthlyTotal": 99.90,
+  "oneTimeTotal": 250.90,
+  "spendingByCategory": [
+    {
+      "category": {
+        "key": "ALIMENTACAO",
+        "name": "Alimentacao",
+        "color": "#16A34A",
+        "icon": "utensils"
+      },
+      "totalSpent": 250.90,
+      "percentage": 100.00
+    }
+  ]
+}
 ```
+
+`remainingDailyAmount` retorna `null` quando a data atual ja passou da
+`targetSpendingDate` ou do fim do ciclo. `spentAfterTargetDate` retorna `null`
+quando o ciclo ja terminou.

@@ -6,6 +6,7 @@ import br.com.ottonsam.toothy_planner_api.financial_manager.dtos.CancelRecurring
 import br.com.ottonsam.toothy_planner_api.financial_manager.dtos.RecurringExpenseRequest;
 import br.com.ottonsam.toothy_planner_api.financial_manager.dtos.RecurringExpenseResponse;
 import br.com.ottonsam.toothy_planner_api.financial_manager.entities.ExpenseEntity;
+import br.com.ottonsam.toothy_planner_api.financial_manager.entities.ExpenseSource;
 import br.com.ottonsam.toothy_planner_api.financial_manager.entities.RecurringExpenseEntity;
 import br.com.ottonsam.toothy_planner_api.financial_manager.repositories.ExpenseCycleRepository;
 import br.com.ottonsam.toothy_planner_api.financial_manager.repositories.ExpenseRepository;
@@ -51,14 +52,18 @@ public class RecurringExpenseUseCase {
     }
 
     public RecurringExpenseResponse create(UUID walletId, RecurringExpenseRequest request) {
+        return RecurringExpenseResponse.from(createEntity(walletId, request, ExpenseSource.MANUAL));
+    }
+
+    RecurringExpenseEntity createEntity(UUID walletId, RecurringExpenseRequest request, ExpenseSource source) {
         var user = currentUserProvider.get();
         var wallet = walletUseCase.findOwned(walletId, user.getId());
-        var category = categoryUseCase.findOwned(request.categoryId(), user.getId());
+        var category = categoryUseCase.required(request.category());
         var recurringExpense = recurringExpenseRepository.save(RecurringExpenseEntity.create(
                 wallet, category, request.description(), request.amount(), request.startsAt()));
         cycleService.findOrCreateByDate(wallet, request.startsAt());
-        generateForExistingCycles(recurringExpense, null);
-        return RecurringExpenseResponse.from(recurringExpense);
+        generateForExistingCycles(recurringExpense, null, source);
+        return recurringExpense;
     }
 
     public List<RecurringExpenseResponse> list(UUID walletId) {
@@ -82,13 +87,13 @@ public class RecurringExpenseUseCase {
         if (!recurringExpense.isActive()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Recurring expense is canceled");
         }
-        var category = categoryUseCase.findOwned(request.categoryId(), user.getId());
+        var category = categoryUseCase.required(request.category());
         recurringExpense.update(category, request.description(), request.amount(), request.startsAt());
         var today = LocalDate.now(clock);
         expenseRepository.deleteAll(
                 expenseRepository.findAllByRecurrenceIdAndCycle_EndsAtGreaterThanEqual(recurringExpenseId, today));
         cycleService.findOrCreateByDate(recurringExpense.getWallet(), recurringExpense.getStartsAt());
-        generateForExistingCycles(recurringExpense, today);
+        generateForExistingCycles(recurringExpense, today, ExpenseSource.MANUAL);
         return RecurringExpenseResponse.from(recurringExpenseRepository.save(recurringExpense));
     }
 
@@ -118,7 +123,7 @@ public class RecurringExpenseUseCase {
     }
 
     private void generateForExistingCycles(
-            RecurringExpenseEntity recurringExpense, LocalDate onlyCyclesEndingOnOrAfter) {
+            RecurringExpenseEntity recurringExpense, LocalDate onlyCyclesEndingOnOrAfter, ExpenseSource source) {
         var startReference =
                 cycleService.referenceForDate(recurringExpense.getWallet(), recurringExpense.getStartsAt());
         cycleRepository
@@ -138,7 +143,8 @@ public class RecurringExpenseUseCase {
                         recurringExpense.getDescription(),
                         recurringExpense.getAmount(),
                         cycleService.recurringExpenseDate(recurringExpense, cycle),
-                        recurringExpense.getId()))
+                        recurringExpense.getId(),
+                        source))
                 .forEach(expenseRepository::save);
     }
 }

@@ -1,0 +1,28 @@
+meta {
+  name: Create Expense From Text
+  type: http
+  seq: 16
+}
+
+post {
+  url: {{baseUrl}}/api/v1/financial-manager/wallets/{{walletId}}/expenses/text
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "text": "Parcelei um notebook em 12 vezes 240,35",
+    "referenceDate": "2026-07-30"
+  }
+}
+
+vars:pre-request {
+  walletId: 0bc13a17-03a8-47d5-b684-64813d31d4d9
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  Uses DeepSeek to classify category and expense type, then creates the expense directly.
+  Expected response: 201 Created.
+}

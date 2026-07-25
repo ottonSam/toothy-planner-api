@@ -5,6 +5,7 @@ import br.com.ottonsam.toothy_planner_api.config.ApiException;
 import br.com.ottonsam.toothy_planner_api.financial_manager.dtos.ExpenseRequest;
 import br.com.ottonsam.toothy_planner_api.financial_manager.dtos.ExpenseResponse;
 import br.com.ottonsam.toothy_planner_api.financial_manager.entities.ExpenseEntity;
+import br.com.ottonsam.toothy_planner_api.financial_manager.entities.ExpenseSource;
 import br.com.ottonsam.toothy_planner_api.financial_manager.entities.ExpenseType;
 import br.com.ottonsam.toothy_planner_api.financial_manager.repositories.ExpenseCycleRepository;
 import br.com.ottonsam.toothy_planner_api.financial_manager.repositories.ExpenseRepository;
@@ -45,13 +46,17 @@ public class ExpenseUseCase {
     }
 
     public ExpenseResponse create(UUID walletId, ExpenseRequest request) {
+        return create(walletId, request, ExpenseSource.MANUAL);
+    }
+
+    ExpenseResponse create(UUID walletId, ExpenseRequest request, ExpenseSource source) {
         var user = currentUserProvider.get();
         var wallet = walletUseCase.findOwned(walletId, user.getId());
-        var category = categoryUseCase.findOwned(request.categoryId(), user.getId());
+        var category = categoryUseCase.required(request.category());
         var expenseDate = requiredExpenseDate(request);
         var cycle = cycleService.findOrCreateByDate(wallet, expenseDate);
-        var expense =
-                ExpenseEntity.oneTime(wallet, cycle, category, request.description(), request.amount(), expenseDate);
+        var expense = ExpenseEntity.oneTime(
+                wallet, cycle, category, request.description(), request.amount(), expenseDate, source);
         return ExpenseResponse.from(expenseRepository.save(expense));
     }
 
@@ -87,7 +92,7 @@ public class ExpenseUseCase {
     public ExpenseResponse update(UUID walletId, UUID expenseId, ExpenseRequest request) {
         var user = currentUserProvider.get();
         var expense = findOwned(walletId, expenseId, user.getId());
-        var category = categoryUseCase.findOwned(request.categoryId(), user.getId());
+        var category = categoryUseCase.required(request.category());
         var expenseDate = requiredExpenseDate(request);
         var cycle = cycleService.findOrCreateByDate(expense.getWallet(), expenseDate);
         expense.update(cycle, category, request.description(), request.amount(), expenseDate);

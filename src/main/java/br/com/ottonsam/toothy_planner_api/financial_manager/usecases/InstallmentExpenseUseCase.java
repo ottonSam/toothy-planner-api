@@ -5,6 +5,7 @@ import br.com.ottonsam.toothy_planner_api.config.ApiException;
 import br.com.ottonsam.toothy_planner_api.financial_manager.dtos.InstallmentExpenseRequest;
 import br.com.ottonsam.toothy_planner_api.financial_manager.dtos.InstallmentExpenseResponse;
 import br.com.ottonsam.toothy_planner_api.financial_manager.entities.ExpenseEntity;
+import br.com.ottonsam.toothy_planner_api.financial_manager.entities.ExpenseSource;
 import br.com.ottonsam.toothy_planner_api.financial_manager.entities.InstallmentExpenseEntity;
 import br.com.ottonsam.toothy_planner_api.financial_manager.repositories.ExpenseRepository;
 import br.com.ottonsam.toothy_planner_api.financial_manager.repositories.InstallmentExpenseRepository;
@@ -48,9 +49,13 @@ public class InstallmentExpenseUseCase {
     }
 
     public InstallmentExpenseResponse create(UUID walletId, InstallmentExpenseRequest request) {
+        return InstallmentExpenseResponse.from(createEntity(walletId, request, ExpenseSource.MANUAL));
+    }
+
+    InstallmentExpenseEntity createEntity(UUID walletId, InstallmentExpenseRequest request, ExpenseSource source) {
         var user = currentUserProvider.get();
         var wallet = walletUseCase.findOwned(walletId, user.getId());
-        var category = categoryUseCase.findOwned(request.categoryId(), user.getId());
+        var category = categoryUseCase.required(request.category());
         var installmentExpense = installmentExpenseRepository.save(InstallmentExpenseEntity.create(
                 wallet,
                 category,
@@ -59,8 +64,8 @@ public class InstallmentExpenseUseCase {
                 request.installmentAmount(),
                 request.installments(),
                 request.firstExpenseDate()));
-        generateInstallments(installmentExpense, null);
-        return InstallmentExpenseResponse.from(installmentExpense);
+        generateInstallments(installmentExpense, null, source);
+        return installmentExpense;
     }
 
     public List<InstallmentExpenseResponse> list(UUID walletId) {
@@ -82,7 +87,7 @@ public class InstallmentExpenseUseCase {
             UUID walletId, UUID installmentExpenseId, InstallmentExpenseRequest request) {
         var user = currentUserProvider.get();
         var installmentExpense = findOwned(walletId, installmentExpenseId, user.getId());
-        var category = categoryUseCase.findOwned(request.categoryId(), user.getId());
+        var category = categoryUseCase.required(request.category());
         installmentExpense.update(
                 category,
                 request.description(),
@@ -93,7 +98,7 @@ public class InstallmentExpenseUseCase {
         var today = LocalDate.now(clock);
         expenseRepository.deleteAll(
                 expenseRepository.findAllByParentExpenseIdAndCycle_EndsAtGreaterThanEqual(installmentExpenseId, today));
-        generateInstallments(installmentExpense, today);
+        generateInstallments(installmentExpense, today, ExpenseSource.MANUAL);
         return InstallmentExpenseResponse.from(installmentExpenseRepository.save(installmentExpense));
     }
 
@@ -114,7 +119,7 @@ public class InstallmentExpenseUseCase {
     }
 
     private void generateInstallments(
-            InstallmentExpenseEntity installmentExpense, LocalDate onlyCyclesEndingOnOrAfter) {
+            InstallmentExpenseEntity installmentExpense, LocalDate onlyCyclesEndingOnOrAfter, ExpenseSource source) {
         var amount = installmentAmount(installmentExpense);
         for (int index = 0; index < installmentExpense.getInstallments(); index++) {
             var expenseDate = installmentExpense.getFirstExpenseDate().plusMonths(index);
@@ -131,7 +136,8 @@ public class InstallmentExpenseUseCase {
                     expenseDate,
                     installmentExpense.getId(),
                     index + 1,
-                    installmentExpense.getInstallments()));
+                    installmentExpense.getInstallments(),
+                    source));
         }
     }
 

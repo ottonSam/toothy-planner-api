@@ -5,7 +5,7 @@ import br.com.ottonsam.toothy_planner_api.config.ApiException;
 import br.com.ottonsam.toothy_planner_api.financial_manager.dtos.ExpenseCategorySummaryResponse;
 import br.com.ottonsam.toothy_planner_api.financial_manager.dtos.ExpenseCycleMetricsResponse;
 import br.com.ottonsam.toothy_planner_api.financial_manager.dtos.ExpenseSpendingByCategoryResponse;
-import br.com.ottonsam.toothy_planner_api.financial_manager.entities.ExpenseCategoryEntity;
+import br.com.ottonsam.toothy_planner_api.financial_manager.entities.ExpenseCategory;
 import br.com.ottonsam.toothy_planner_api.financial_manager.entities.ExpenseCycleEntity;
 import br.com.ottonsam.toothy_planner_api.financial_manager.entities.ExpenseEntity;
 import br.com.ottonsam.toothy_planner_api.financial_manager.entities.ExpenseType;
@@ -78,6 +78,10 @@ public class ExpenseMetricsUseCase {
                 .map(ExpenseEntity::getAmount));
         var remainingAmount = money(wallet.getSpendingGoal().subtract(totalSpent));
         var remainingDailyAmount = remainingDailyAmount(cycle, remainingAmount);
+        var spentUntilTargetDate = sum(expenses.stream()
+                .filter(expense -> !expense.getExpenseDate().isAfter(cycle.getTargetSpendingDate()))
+                .map(ExpenseEntity::getAmount));
+        var spentAfterTargetDate = spentAfterTargetDate(cycle, expenses);
         var reference = new ExpenseCycleService.CycleReference(cycle.getReferenceMonth(), cycle.getReferenceYear());
         return new ExpenseCycleMetricsResponse(
                 wallet.getId(),
@@ -86,10 +90,13 @@ public class ExpenseMetricsUseCase {
                 cycle.getReferenceYear(),
                 cycle.getStartsAt(),
                 cycle.getEndsAt(),
+                cycle.getTargetSpendingDate(),
                 money(wallet.getSpendingGoal()),
                 totalSpent,
                 remainingAmount,
                 remainingDailyAmount,
+                spentUntilTargetDate,
+                spentAfterTargetDate,
                 installmentTotalFromReference(wallet.getId(), reference),
                 activeRecurringMonthlyTotal(wallet.getId()),
                 oneTimeTotal,
@@ -109,15 +116,25 @@ public class ExpenseMetricsUseCase {
 
     private BigDecimal remainingDailyAmount(ExpenseCycleEntity cycle, BigDecimal remainingAmount) {
         var today = LocalDate.now(clock);
-        if (today.isAfter(cycle.getEndsAt())) {
-            return ZERO;
+        if (today.isAfter(cycle.getTargetSpendingDate()) || today.isAfter(cycle.getEndsAt())) {
+            return null;
         }
         var start = today.isBefore(cycle.getStartsAt()) ? cycle.getStartsAt() : today;
-        var days = ChronoUnit.DAYS.between(start, cycle.getEndsAt()) + 1;
+        var days = ChronoUnit.DAYS.between(start, cycle.getTargetSpendingDate()) + 1;
         if (days <= 0) {
-            return ZERO;
+            return null;
         }
         return remainingAmount.divide(BigDecimal.valueOf(days), 2, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal spentAfterTargetDate(ExpenseCycleEntity cycle, List<ExpenseEntity> expenses) {
+        var today = LocalDate.now(clock);
+        if (today.isAfter(cycle.getEndsAt())) {
+            return null;
+        }
+        return sum(expenses.stream()
+                .filter(expense -> expense.getExpenseDate().isAfter(cycle.getTargetSpendingDate()))
+                .map(ExpenseEntity::getAmount));
     }
 
     private List<ExpenseSpendingByCategoryResponse> spendingByCategory(
@@ -126,16 +143,17 @@ public class ExpenseMetricsUseCase {
             return List.of();
         }
 
-        var categories = new HashMap<UUID, ExpenseCategoryEntity>();
-        var totals = new HashMap<UUID, BigDecimal>();
+        var categories = new HashMap<ExpenseCategory, ExpenseCategory>();
+        var totals = new HashMap<ExpenseCategory, BigDecimal>();
         for (var expense : expenses) {
             var category = expense.getCategory();
-            categories.putIfAbsent(category.getId(), category);
-            totals.merge(category.getId(), expense.getAmount(), BigDecimal::add);
+            categories.putIfAbsent(category, category);
+            totals.merge(category, expense.getAmount(), BigDecimal::add);
         }
 
         return totals.entrySet().stream()
-                .sorted(Comparator.<Map.Entry<UUID, BigDecimal>, BigDecimal>comparing(entry -> money(entry.getValue()))
+                .sorted(Comparator.<Map.Entry<ExpenseCategory, BigDecimal>, BigDecimal>comparing(
+                                entry -> money(entry.getValue()))
                         .reversed()
                         .thenComparing(
                                 entry -> categories.get(entry.getKey()).getName(), String.CASE_INSENSITIVE_ORDER))

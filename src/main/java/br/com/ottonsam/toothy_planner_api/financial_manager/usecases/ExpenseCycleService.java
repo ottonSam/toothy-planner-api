@@ -1,5 +1,6 @@
 package br.com.ottonsam.toothy_planner_api.financial_manager.usecases;
 
+import br.com.ottonsam.toothy_planner_api.config.ApiException;
 import br.com.ottonsam.toothy_planner_api.financial_manager.entities.ExpenseCycleEntity;
 import br.com.ottonsam.toothy_planner_api.financial_manager.entities.ExpenseEntity;
 import br.com.ottonsam.toothy_planner_api.financial_manager.entities.ExpenseWalletEntity;
@@ -9,7 +10,7 @@ import br.com.ottonsam.toothy_planner_api.financial_manager.repositories.Expense
 import br.com.ottonsam.toothy_planner_api.financial_manager.repositories.RecurringExpenseRepository;
 import java.time.LocalDate;
 import java.time.YearMonth;
-import java.time.temporal.ChronoUnit;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -36,20 +37,24 @@ public class ExpenseCycleService {
     }
 
     public CycleReference referenceForDate(ExpenseWalletEntity wallet, LocalDate date) {
-        var effectiveEndDay = effectiveEndDay(date.getYear(), date.getMonthValue(), wallet.getCycleEndDay());
-        var referenceMonth = YearMonth.from(date);
-        if (date.getDayOfMonth() > effectiveEndDay) {
-            referenceMonth = referenceMonth.plusMonths(1);
-        }
-        return new CycleReference(referenceMonth.getMonthValue(), referenceMonth.getYear());
+        validateWalletAndDate(wallet, date);
+        var period = periodForDate(wallet, date);
+        return referenceForPeriod(period);
     }
 
     public CyclePeriod periodForReference(ExpenseWalletEntity wallet, CycleReference reference) {
-        var referenceMonth = YearMonth.of(reference.year(), reference.month());
-        var previousReferenceMonth = referenceMonth.minusMonths(1);
-        var endsAt = endDateFor(referenceMonth, wallet.getCycleEndDay());
-        var previousEndsAt = endDateFor(previousReferenceMonth, wallet.getCycleEndDay());
-        return new CyclePeriod(previousEndsAt.plusDays(1), endsAt);
+        validateWallet(wallet);
+        var endMonth = YearMonth.of(reference.year(), reference.month());
+        var start = anchoredDate(wallet.getStartsAt(), endMonth.minusMonths(1));
+        var end = anchoredDate(wallet.getStartsAt(), endMonth).minusDays(1);
+        if (end.isBefore(wallet.getStartsAt())) {
+            start = wallet.getStartsAt();
+            end = anchoredDate(
+                            wallet.getStartsAt(),
+                            YearMonth.from(wallet.getStartsAt()).plusMonths(1))
+                    .minusDays(1);
+        }
+        return new CyclePeriod(start, end, targetSpendingDate(start, end, wallet.getTargetSpendingDay()));
     }
 
     public int compare(ExpenseCycleEntity cycle, CycleReference reference) {
@@ -65,22 +70,7 @@ public class ExpenseCycleService {
     }
 
     public LocalDate recurringExpenseDate(RecurringExpenseEntity recurringExpense, ExpenseCycleEntity cycle) {
-        var startReference = referenceForDate(recurringExpense.getWallet(), recurringExpense.getStartsAt());
-        var startPeriod = periodForReference(recurringExpense.getWallet(), startReference);
-        var offset = ChronoUnit.DAYS.between(startPeriod.startsAt(), recurringExpense.getStartsAt());
-        var expenseDate = cycle.getStartsAt().plusDays(offset);
-        if (expenseDate.isAfter(cycle.getEndsAt())) {
-            return cycle.getEndsAt();
-        }
-        return expenseDate;
-    }
-
-    private ExpenseCycleEntity createCycle(ExpenseWalletEntity wallet, CycleReference reference) {
-        var period = periodForReference(wallet, reference);
-        var cycle = cycleRepository.save(ExpenseCycleEntity.create(
-                wallet, reference.month(), reference.year(), period.startsAt(), period.endsAt()));
-        generateActiveRecurringExpenses(wallet, cycle);
-        return cycle;
+        return dateForDayInCycle(cycle, recurringExpense.getStartsAt().getDayOfMonth());
     }
 
     public void generateActiveRecurringExpenses(ExpenseWalletEntity wallet, ExpenseCycleEntity cycle) {
@@ -99,21 +89,91 @@ public class ExpenseCycleService {
                 .forEach(expenseRepository::save);
     }
 
+    private ExpenseCycleEntity createCycle(ExpenseWalletEntity wallet, CycleReference reference) {
+        var period = periodForReference(wallet, reference);
+        var cycle = cycleRepository.save(ExpenseCycleEntity.create(
+                wallet,
+                reference.month(),
+                reference.year(),
+                period.startsAt(),
+                period.endsAt(),
+                period.targetSpendingDate()));
+        generateActiveRecurringExpenses(wallet, cycle);
+        return cycle;
+    }
+
     private boolean shouldGenerate(RecurringExpenseEntity recurringExpense, ExpenseCycleEntity cycle) {
         var startReference = referenceForDate(recurringExpense.getWallet(), recurringExpense.getStartsAt());
         return compare(cycle, startReference) >= 0;
     }
 
-    private LocalDate endDateFor(YearMonth referenceMonth, int cycleEndDay) {
-        return referenceMonth.atDay(
-                effectiveEndDay(referenceMonth.getYear(), referenceMonth.getMonthValue(), cycleEndDay));
+    private CyclePeriod periodForDate(ExpenseWalletEntity wallet, LocalDate date) {
+        var start = anchoredDate(wallet.getStartsAt(), YearMonth.from(date));
+        if (start.isAfter(date)) {
+            start = anchoredDate(wallet.getStartsAt(), YearMonth.from(date).minusMonths(1));
+        }
+        if (start.isBefore(wallet.getStartsAt())) {
+            start = wallet.getStartsAt();
+        }
+        var end = anchoredDate(wallet.getStartsAt(), YearMonth.from(start).plusMonths(1))
+                .minusDays(1);
+        return new CyclePeriod(start, end, targetSpendingDate(start, end, wallet.getTargetSpendingDay()));
     }
 
-    private int effectiveEndDay(int year, int month, int cycleEndDay) {
-        return Math.min(cycleEndDay, YearMonth.of(year, month).lengthOfMonth());
+    private CycleReference referenceForPeriod(CyclePeriod period) {
+        return new CycleReference(
+                period.endsAt().getMonthValue(), period.endsAt().getYear());
+    }
+
+    private LocalDate anchoredDate(LocalDate walletStartsAt, YearMonth month) {
+        return month.atDay(Math.min(walletStartsAt.getDayOfMonth(), month.lengthOfMonth()));
+    }
+
+    private LocalDate targetSpendingDate(LocalDate startsAt, LocalDate endsAt, int targetSpendingDay) {
+        var target = dateForDayBetween(startsAt, endsAt, targetSpendingDay);
+        if (target == null) {
+            return endsAt;
+        }
+        return target;
+    }
+
+    private LocalDate dateForDayInCycle(ExpenseCycleEntity cycle, int dayOfMonth) {
+        var target = dateForDayBetween(cycle.getStartsAt(), cycle.getEndsAt(), dayOfMonth);
+        if (target == null) {
+            return cycle.getEndsAt();
+        }
+        return target;
+    }
+
+    private LocalDate dateForDayBetween(LocalDate startsAt, LocalDate endsAt, int dayOfMonth) {
+        var month = YearMonth.from(startsAt);
+        while (!month.atDay(1).isAfter(endsAt)) {
+            var date = month.atDay(Math.min(dayOfMonth, month.lengthOfMonth()));
+            if (!date.isBefore(startsAt) && !date.isAfter(endsAt)) {
+                return date;
+            }
+            month = month.plusMonths(1);
+        }
+        return null;
+    }
+
+    private void validateWalletAndDate(ExpenseWalletEntity wallet, LocalDate date) {
+        validateWallet(wallet);
+        if (date == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Expense date is required");
+        }
+        if (date.isBefore(wallet.getStartsAt())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Expense date must be on or after wallet start date");
+        }
+    }
+
+    private void validateWallet(ExpenseWalletEntity wallet) {
+        if (wallet == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Wallet is required");
+        }
     }
 
     public record CycleReference(int month, int year) {}
 
-    public record CyclePeriod(LocalDate startsAt, LocalDate endsAt) {}
+    public record CyclePeriod(LocalDate startsAt, LocalDate endsAt, LocalDate targetSpendingDate) {}
 }

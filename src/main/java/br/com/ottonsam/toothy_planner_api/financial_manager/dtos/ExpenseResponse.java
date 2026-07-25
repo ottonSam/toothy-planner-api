@@ -1,6 +1,7 @@
 package br.com.ottonsam.toothy_planner_api.financial_manager.dtos;
 
 import br.com.ottonsam.toothy_planner_api.financial_manager.entities.ExpenseEntity;
+import br.com.ottonsam.toothy_planner_api.financial_manager.entities.ExpenseSource;
 import br.com.ottonsam.toothy_planner_api.financial_manager.entities.ExpenseType;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -16,6 +17,7 @@ public record ExpenseResponse(
         BigDecimal amount,
         LocalDate expenseDate,
         ExpenseType type,
+        ExpenseSource source,
         UUID parentExpenseId,
         Integer installmentNumber,
         Integer installmentTotal,
@@ -33,6 +35,7 @@ public record ExpenseResponse(
                 expense.getAmount(),
                 expense.getExpenseDate(),
                 expense.getType(),
+                expense.getSource(),
                 expense.getParentExpenseId(),
                 expense.getInstallmentNumber(),
                 expense.getInstallmentTotal(),

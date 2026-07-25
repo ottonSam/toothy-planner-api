@@ -1,19 +1,15 @@
 package br.com.ottonsam.toothy_planner_api.financial_manager.dtos;
 
-import br.com.ottonsam.toothy_planner_api.financial_manager.entities.ExpenseCategoryEntity;
-import java.time.OffsetDateTime;
-import java.util.UUID;
+import br.com.ottonsam.toothy_planner_api.financial_manager.entities.ExpenseCategory;
 
-public record ExpenseCategoryResponse(
-        UUID id, String name, String color, String icon, OffsetDateTime createdAt, OffsetDateTime updatedAt) {
+public record ExpenseCategoryResponse(String key, String name, String color, String icon, String description) {
 
-    public static ExpenseCategoryResponse from(ExpenseCategoryEntity category) {
+    public static ExpenseCategoryResponse from(ExpenseCategory category) {
         return new ExpenseCategoryResponse(
-                category.getId(),
+                category.getKey(),
                 category.getName(),
                 category.getColor(),
                 category.getIcon(),
-                category.getCreatedAt(),
-                category.getUpdatedAt());
+                category.getDescription());
     }
 }

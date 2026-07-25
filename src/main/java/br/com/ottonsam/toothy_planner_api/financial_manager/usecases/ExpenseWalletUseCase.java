@@ -57,8 +57,8 @@ public class ExpenseWalletUseCase {
     public ExpenseWalletResponse create(ExpenseWalletRequest request) {
         var user = currentUserProvider.get();
         ensureDescriptionIsUnique(request.description(), user.getId());
-        var wallet =
-                ExpenseWalletEntity.create(request.description(), request.spendingGoal(), request.cycleEndDay(), user);
+        var wallet = ExpenseWalletEntity.create(
+                request.description(), request.spendingGoal(), request.startsAt(), request.targetSpendingDay(), user);
         return ExpenseWalletResponse.from(walletRepository.save(wallet));
     }
 
@@ -78,7 +78,7 @@ public class ExpenseWalletUseCase {
         var user = currentUserProvider.get();
         var wallet = findOwned(id, user.getId());
         ensureDescriptionIsUniqueForUpdate(request.description(), user.getId(), id);
-        wallet.update(request.description(), request.spendingGoal(), request.cycleEndDay());
+        wallet.update(request.description(), request.spendingGoal(), request.startsAt(), request.targetSpendingDay());
         return ExpenseWalletResponse.from(walletRepository.save(wallet));
     }
 
@@ -100,25 +100,31 @@ public class ExpenseWalletUseCase {
         var user = currentUserProvider.get();
         var wallet = findOwned(id, user.getId());
         var today = LocalDate.now(clock);
-        var currentReference = cycleService.referenceForDate(wallet, today);
-        var currentCycle = cycleRepository
-                .findByWalletIdAndReferenceMonthAndReferenceYear(
-                        wallet.getId(), currentReference.month(), currentReference.year())
-                .orElse(null);
+        var currentReference =
+                today.isBefore(wallet.getStartsAt()) ? null : cycleService.referenceForDate(wallet, today);
+        var currentCycle = currentReference == null
+                ? null
+                : cycleRepository
+                        .findByWalletIdAndReferenceMonthAndReferenceYear(
+                                wallet.getId(), currentReference.month(), currentReference.year())
+                        .orElse(null);
         var currentCycleMetrics =
                 currentCycle == null ? null : metricsUseCase.calculateCycleMetrics(wallet, currentCycle);
         return new ExpenseWalletMetricsResponse(
                 wallet.getId(),
                 wallet.getDescription(),
                 wallet.getSpendingGoal(),
-                wallet.getCycleEndDay(),
+                wallet.getStartsAt(),
+                wallet.getTargetSpendingDay(),
                 currentCycle == null
                         ? null
                         : br.com.ottonsam.toothy_planner_api.financial_manager.dtos.ExpenseCycleResponse.from(
                                 currentCycle),
                 currentCycleMetrics,
                 metricsUseCase.activeRecurringMonthlyTotal(wallet.getId()),
-                metricsUseCase.installmentTotalFromReference(wallet.getId(), currentReference));
+                currentReference == null
+                        ? java.math.BigDecimal.ZERO.setScale(2)
+                        : metricsUseCase.installmentTotalFromReference(wallet.getId(), currentReference));
     }
 
     ExpenseWalletEntity findOwned(UUID id, UUID userId) {

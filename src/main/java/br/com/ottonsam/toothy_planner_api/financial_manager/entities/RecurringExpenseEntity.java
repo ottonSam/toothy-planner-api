@@ -3,6 +3,8 @@ package br.com.ottonsam.toothy_planner_api.financial_manager.entities;
 import br.com.ottonsam.toothy_planner_api.config.ApiException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
@@ -33,9 +35,9 @@ public class RecurringExpenseEntity {
     @JoinColumn(name = "wallet_id", nullable = false)
     @NotNull(message = "Recurring expense wallet is required") private ExpenseWalletEntity wallet;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "category_id", nullable = false)
-    @NotNull(message = "Recurring expense category is required") private ExpenseCategoryEntity category;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @NotNull(message = "Recurring expense category is required") private ExpenseCategory category;
 
     @Column(nullable = false)
     @NotBlank(message = "Recurring expense description is required") private String description;
@@ -58,7 +60,7 @@ public class RecurringExpenseEntity {
     private RecurringExpenseEntity(
             UUID id,
             ExpenseWalletEntity wallet,
-            ExpenseCategoryEntity category,
+            ExpenseCategory category,
             String description,
             BigDecimal amount,
             LocalDate startsAt) {
@@ -74,7 +76,7 @@ public class RecurringExpenseEntity {
 
     public static RecurringExpenseEntity create(
             ExpenseWalletEntity wallet,
-            ExpenseCategoryEntity category,
+            ExpenseCategory category,
             String description,
             BigDecimal amount,
             LocalDate startsAt) {
@@ -82,7 +84,7 @@ public class RecurringExpenseEntity {
         return new RecurringExpenseEntity(UUID.randomUUID(), wallet, category, description, amount, startsAt);
     }
 
-    public void update(ExpenseCategoryEntity category, String description, BigDecimal amount, LocalDate startsAt) {
+    public void update(ExpenseCategory category, String description, BigDecimal amount, LocalDate startsAt) {
         validate(wallet, category, description, amount, startsAt);
         this.category = category;
         this.description = description.trim();
@@ -105,7 +107,7 @@ public class RecurringExpenseEntity {
 
     private static void validate(
             ExpenseWalletEntity wallet,
-            ExpenseCategoryEntity category,
+            ExpenseCategory category,
             String description,
             BigDecimal amount,
             LocalDate startsAt) {

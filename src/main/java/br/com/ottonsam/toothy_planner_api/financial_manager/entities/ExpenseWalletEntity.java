@@ -15,6 +15,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 import lombok.AccessLevel;
@@ -37,8 +38,11 @@ public class ExpenseWalletEntity {
     @Column(name = "spending_goal", nullable = false, precision = 19, scale = 2)
     @NotNull(message = "Wallet spending goal is required") @DecimalMin(value = "0.01", message = "Wallet spending goal must be greater than zero") private BigDecimal spendingGoal;
 
-    @Column(name = "cycle_end_day", nullable = false)
-    @Min(value = 1, message = "Wallet cycle end day must be between 1 and 31") @Max(value = 31, message = "Wallet cycle end day must be between 1 and 31") private int cycleEndDay;
+    @Column(name = "starts_at", nullable = false)
+    @NotNull(message = "Wallet start date is required") private LocalDate startsAt;
+
+    @Column(name = "target_spending_day", nullable = false)
+    @Min(value = 1, message = "Wallet target spending day must be between 1 and 31") @Max(value = 31, message = "Wallet target spending day must be between 1 and 31") private int targetSpendingDay;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)
@@ -51,32 +55,45 @@ public class ExpenseWalletEntity {
     @NotNull(message = "Updated at is required") private OffsetDateTime updatedAt;
 
     private ExpenseWalletEntity(
-            UUID id, String description, BigDecimal spendingGoal, int cycleEndDay, UserEntity user) {
+            UUID id,
+            String description,
+            BigDecimal spendingGoal,
+            LocalDate startsAt,
+            int targetSpendingDay,
+            UserEntity user) {
         this.id = id;
         this.description = description.trim();
         this.spendingGoal = spendingGoal;
-        this.cycleEndDay = cycleEndDay;
+        this.startsAt = startsAt;
+        this.targetSpendingDay = targetSpendingDay;
         this.user = user;
         this.createdAt = OffsetDateTime.now();
         this.updatedAt = createdAt;
     }
 
     public static ExpenseWalletEntity create(
-            String description, BigDecimal spendingGoal, Integer cycleEndDay, UserEntity user) {
+            String description,
+            BigDecimal spendingGoal,
+            LocalDate startsAt,
+            Integer targetSpendingDay,
+            UserEntity user) {
         validateDescription(description);
         validateSpendingGoal(spendingGoal);
-        validateCycleEndDay(cycleEndDay);
+        validateStartsAt(startsAt);
+        validateTargetSpendingDay(targetSpendingDay);
         validateUser(user);
-        return new ExpenseWalletEntity(UUID.randomUUID(), description, spendingGoal, cycleEndDay, user);
+        return new ExpenseWalletEntity(UUID.randomUUID(), description, spendingGoal, startsAt, targetSpendingDay, user);
     }
 
-    public void update(String description, BigDecimal spendingGoal, Integer cycleEndDay) {
+    public void update(String description, BigDecimal spendingGoal, LocalDate startsAt, Integer targetSpendingDay) {
         validateDescription(description);
         validateSpendingGoal(spendingGoal);
-        validateCycleEndDay(cycleEndDay);
+        validateStartsAt(startsAt);
+        validateTargetSpendingDay(targetSpendingDay);
         this.description = description.trim();
         this.spendingGoal = spendingGoal;
-        this.cycleEndDay = cycleEndDay;
+        this.startsAt = startsAt;
+        this.targetSpendingDay = targetSpendingDay;
         this.updatedAt = OffsetDateTime.now();
     }
 
@@ -92,9 +109,15 @@ public class ExpenseWalletEntity {
         }
     }
 
-    public static void validateCycleEndDay(Integer cycleEndDay) {
-        if (cycleEndDay == null || cycleEndDay < 1 || cycleEndDay > 31) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "Wallet cycle end day must be between 1 and 31");
+    public static void validateStartsAt(LocalDate startsAt) {
+        if (startsAt == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Wallet start date is required");
+        }
+    }
+
+    public static void validateTargetSpendingDay(Integer targetSpendingDay) {
+        if (targetSpendingDay == null || targetSpendingDay < 1 || targetSpendingDay > 31) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Wallet target spending day must be between 1 and 31");
         }
     }
 

@@ -39,9 +39,9 @@ public class ExpenseEntity {
     @JoinColumn(name = "cycle_id", nullable = false)
     @NotNull(message = "Expense cycle is required") private ExpenseCycleEntity cycle;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "category_id", nullable = false)
-    @NotNull(message = "Expense category is required") private ExpenseCategoryEntity category;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @NotNull(message = "Expense category is required") private ExpenseCategory category;
 
     @Column(nullable = false)
     @NotBlank(message = "Expense description is required") private String description;
@@ -55,6 +55,10 @@ public class ExpenseEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @NotNull(message = "Expense type is required") private ExpenseType type;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @NotNull(message = "Expense source is required") private ExpenseSource source;
 
     @Column(name = "parent_expense_id")
     private UUID parentExpenseId;
@@ -78,11 +82,12 @@ public class ExpenseEntity {
             UUID id,
             ExpenseWalletEntity wallet,
             ExpenseCycleEntity cycle,
-            ExpenseCategoryEntity category,
+            ExpenseCategory category,
             String description,
             BigDecimal amount,
             LocalDate expenseDate,
             ExpenseType type,
+            ExpenseSource source,
             UUID parentExpenseId,
             Integer installmentNumber,
             Integer installmentTotal,
@@ -95,6 +100,7 @@ public class ExpenseEntity {
         this.amount = amount;
         this.expenseDate = expenseDate;
         this.type = type;
+        this.source = source;
         this.parentExpenseId = parentExpenseId;
         this.installmentNumber = installmentNumber;
         this.installmentTotal = installmentTotal;
@@ -106,11 +112,23 @@ public class ExpenseEntity {
     public static ExpenseEntity oneTime(
             ExpenseWalletEntity wallet,
             ExpenseCycleEntity cycle,
-            ExpenseCategoryEntity category,
+            ExpenseCategory category,
             String description,
             BigDecimal amount,
             LocalDate expenseDate) {
+        return oneTime(wallet, cycle, category, description, amount, expenseDate, ExpenseSource.MANUAL);
+    }
+
+    public static ExpenseEntity oneTime(
+            ExpenseWalletEntity wallet,
+            ExpenseCycleEntity cycle,
+            ExpenseCategory category,
+            String description,
+            BigDecimal amount,
+            LocalDate expenseDate,
+            ExpenseSource source) {
         validateBase(wallet, cycle, category, description, amount, expenseDate);
+        validateSource(source);
         return new ExpenseEntity(
                 UUID.randomUUID(),
                 wallet,
@@ -120,6 +138,7 @@ public class ExpenseEntity {
                 amount,
                 expenseDate,
                 ExpenseType.ONE_TIME,
+                source,
                 null,
                 null,
                 null,
@@ -129,16 +148,41 @@ public class ExpenseEntity {
     public static ExpenseEntity installment(
             ExpenseWalletEntity wallet,
             ExpenseCycleEntity cycle,
-            ExpenseCategoryEntity category,
+            ExpenseCategory category,
             String description,
             BigDecimal amount,
             LocalDate expenseDate,
             UUID parentExpenseId,
             int installmentNumber,
             int installmentTotal) {
+        return installment(
+                wallet,
+                cycle,
+                category,
+                description,
+                amount,
+                expenseDate,
+                parentExpenseId,
+                installmentNumber,
+                installmentTotal,
+                ExpenseSource.MANUAL);
+    }
+
+    public static ExpenseEntity installment(
+            ExpenseWalletEntity wallet,
+            ExpenseCycleEntity cycle,
+            ExpenseCategory category,
+            String description,
+            BigDecimal amount,
+            LocalDate expenseDate,
+            UUID parentExpenseId,
+            int installmentNumber,
+            int installmentTotal,
+            ExpenseSource source) {
         validateBase(wallet, cycle, category, description, amount, expenseDate);
         validateParentExpense(parentExpenseId);
         validateInstallmentPosition(installmentNumber, installmentTotal);
+        validateSource(source);
         return new ExpenseEntity(
                 UUID.randomUUID(),
                 wallet,
@@ -148,6 +192,7 @@ public class ExpenseEntity {
                 amount,
                 expenseDate,
                 ExpenseType.INSTALLMENT,
+                source,
                 parentExpenseId,
                 installmentNumber,
                 installmentTotal,
@@ -157,13 +202,26 @@ public class ExpenseEntity {
     public static ExpenseEntity recurring(
             ExpenseWalletEntity wallet,
             ExpenseCycleEntity cycle,
-            ExpenseCategoryEntity category,
+            ExpenseCategory category,
             String description,
             BigDecimal amount,
             LocalDate expenseDate,
             UUID recurrenceId) {
+        return recurring(wallet, cycle, category, description, amount, expenseDate, recurrenceId, ExpenseSource.MANUAL);
+    }
+
+    public static ExpenseEntity recurring(
+            ExpenseWalletEntity wallet,
+            ExpenseCycleEntity cycle,
+            ExpenseCategory category,
+            String description,
+            BigDecimal amount,
+            LocalDate expenseDate,
+            UUID recurrenceId,
+            ExpenseSource source) {
         validateBase(wallet, cycle, category, description, amount, expenseDate);
         validateRecurrence(recurrenceId);
+        validateSource(source);
         return new ExpenseEntity(
                 UUID.randomUUID(),
                 wallet,
@@ -173,6 +231,7 @@ public class ExpenseEntity {
                 amount,
                 expenseDate,
                 ExpenseType.RECURRING,
+                source,
                 null,
                 null,
                 null,
@@ -181,7 +240,7 @@ public class ExpenseEntity {
 
     public void update(
             ExpenseCycleEntity cycle,
-            ExpenseCategoryEntity category,
+            ExpenseCategory category,
             String description,
             BigDecimal amount,
             LocalDate expenseDate) {
@@ -196,7 +255,7 @@ public class ExpenseEntity {
 
     public void updateGenerated(
             ExpenseCycleEntity cycle,
-            ExpenseCategoryEntity category,
+            ExpenseCategory category,
             String description,
             BigDecimal amount,
             LocalDate expenseDate) {
@@ -212,7 +271,7 @@ public class ExpenseEntity {
     private static void validateBase(
             ExpenseWalletEntity wallet,
             ExpenseCycleEntity cycle,
-            ExpenseCategoryEntity category,
+            ExpenseCategory category,
             String description,
             BigDecimal amount,
             LocalDate expenseDate) {
@@ -245,6 +304,12 @@ public class ExpenseEntity {
     private static void validateRecurrence(UUID recurrenceId) {
         if (recurrenceId == null) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Recurring expense id is required");
+        }
+    }
+
+    private static void validateSource(ExpenseSource source) {
+        if (source == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Expense source is required");
         }
     }
 

@@ -3,6 +3,8 @@ package br.com.ottonsam.toothy_planner_api.financial_manager.entities;
 import br.com.ottonsam.toothy_planner_api.config.ApiException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
@@ -33,9 +35,9 @@ public class InstallmentExpenseEntity {
     @JoinColumn(name = "wallet_id", nullable = false)
     @NotNull(message = "Installment expense wallet is required") private ExpenseWalletEntity wallet;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "category_id", nullable = false)
-    @NotNull(message = "Installment expense category is required") private ExpenseCategoryEntity category;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @NotNull(message = "Installment expense category is required") private ExpenseCategory category;
 
     @Column(nullable = false)
     @NotBlank(message = "Installment expense description is required") private String description;
@@ -61,7 +63,7 @@ public class InstallmentExpenseEntity {
     private InstallmentExpenseEntity(
             UUID id,
             ExpenseWalletEntity wallet,
-            ExpenseCategoryEntity category,
+            ExpenseCategory category,
             String description,
             BigDecimal totalAmount,
             BigDecimal installmentAmount,
@@ -81,7 +83,7 @@ public class InstallmentExpenseEntity {
 
     public static InstallmentExpenseEntity create(
             ExpenseWalletEntity wallet,
-            ExpenseCategoryEntity category,
+            ExpenseCategory category,
             String description,
             BigDecimal totalAmount,
             BigDecimal installmentAmount,
@@ -100,7 +102,7 @@ public class InstallmentExpenseEntity {
     }
 
     public void update(
-            ExpenseCategoryEntity category,
+            ExpenseCategory category,
             String description,
             BigDecimal totalAmount,
             BigDecimal installmentAmount,
@@ -118,7 +120,7 @@ public class InstallmentExpenseEntity {
 
     private static void validate(
             ExpenseWalletEntity wallet,
-            ExpenseCategoryEntity category,
+            ExpenseCategory category,
             String description,
             BigDecimal totalAmount,
             BigDecimal installmentAmount,

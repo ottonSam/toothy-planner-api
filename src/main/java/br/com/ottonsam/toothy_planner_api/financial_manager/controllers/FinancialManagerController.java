@@ -1,12 +1,13 @@
 package br.com.ottonsam.toothy_planner_api.financial_manager.controllers;
 
 import br.com.ottonsam.toothy_planner_api.financial_manager.dtos.CancelRecurringExpenseRequest;
-import br.com.ottonsam.toothy_planner_api.financial_manager.dtos.ExpenseCategoryRequest;
 import br.com.ottonsam.toothy_planner_api.financial_manager.dtos.ExpenseCategoryResponse;
 import br.com.ottonsam.toothy_planner_api.financial_manager.dtos.ExpenseCycleMetricsResponse;
 import br.com.ottonsam.toothy_planner_api.financial_manager.dtos.ExpenseCycleResponse;
 import br.com.ottonsam.toothy_planner_api.financial_manager.dtos.ExpenseRequest;
 import br.com.ottonsam.toothy_planner_api.financial_manager.dtos.ExpenseResponse;
+import br.com.ottonsam.toothy_planner_api.financial_manager.dtos.ExpenseTextRequest;
+import br.com.ottonsam.toothy_planner_api.financial_manager.dtos.ExpenseTextResponse;
 import br.com.ottonsam.toothy_planner_api.financial_manager.dtos.ExpenseWalletMetricsResponse;
 import br.com.ottonsam.toothy_planner_api.financial_manager.dtos.ExpenseWalletRequest;
 import br.com.ottonsam.toothy_planner_api.financial_manager.dtos.ExpenseWalletResponse;
@@ -17,6 +18,7 @@ import br.com.ottonsam.toothy_planner_api.financial_manager.dtos.RecurringExpens
 import br.com.ottonsam.toothy_planner_api.financial_manager.usecases.ExpenseCategoryUseCase;
 import br.com.ottonsam.toothy_planner_api.financial_manager.usecases.ExpenseCycleUseCase;
 import br.com.ottonsam.toothy_planner_api.financial_manager.usecases.ExpenseMetricsUseCase;
+import br.com.ottonsam.toothy_planner_api.financial_manager.usecases.ExpenseTextUseCase;
 import br.com.ottonsam.toothy_planner_api.financial_manager.usecases.ExpenseUseCase;
 import br.com.ottonsam.toothy_planner_api.financial_manager.usecases.ExpenseWalletUseCase;
 import br.com.ottonsam.toothy_planner_api.financial_manager.usecases.InstallmentExpenseUseCase;
@@ -43,6 +45,7 @@ public class FinancialManagerController {
     private final ExpenseCycleUseCase cycleUseCase;
     private final ExpenseMetricsUseCase metricsUseCase;
     private final ExpenseUseCase expenseUseCase;
+    private final ExpenseTextUseCase expenseTextUseCase;
     private final InstallmentExpenseUseCase installmentExpenseUseCase;
     private final RecurringExpenseUseCase recurringExpenseUseCase;
 
@@ -52,6 +55,7 @@ public class FinancialManagerController {
             ExpenseCycleUseCase cycleUseCase,
             ExpenseMetricsUseCase metricsUseCase,
             ExpenseUseCase expenseUseCase,
+            ExpenseTextUseCase expenseTextUseCase,
             InstallmentExpenseUseCase installmentExpenseUseCase,
             RecurringExpenseUseCase recurringExpenseUseCase) {
         this.categoryUseCase = categoryUseCase;
@@ -59,34 +63,14 @@ public class FinancialManagerController {
         this.cycleUseCase = cycleUseCase;
         this.metricsUseCase = metricsUseCase;
         this.expenseUseCase = expenseUseCase;
+        this.expenseTextUseCase = expenseTextUseCase;
         this.installmentExpenseUseCase = installmentExpenseUseCase;
         this.recurringExpenseUseCase = recurringExpenseUseCase;
-    }
-
-    @PostMapping("/categories")
-    ResponseEntity<ExpenseCategoryResponse> createCategory(@RequestBody ExpenseCategoryRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(categoryUseCase.create(request));
     }
 
     @GetMapping("/categories")
     List<ExpenseCategoryResponse> listCategories() {
         return categoryUseCase.list();
-    }
-
-    @GetMapping("/categories/{categoryId}")
-    ExpenseCategoryResponse getCategory(@PathVariable UUID categoryId) {
-        return categoryUseCase.get(categoryId);
-    }
-
-    @PutMapping("/categories/{categoryId}")
-    ExpenseCategoryResponse updateCategory(@PathVariable UUID categoryId, @RequestBody ExpenseCategoryRequest request) {
-        return categoryUseCase.update(categoryId, request);
-    }
-
-    @DeleteMapping("/categories/{categoryId}")
-    ResponseEntity<Void> deleteCategory(@PathVariable UUID categoryId) {
-        categoryUseCase.delete(categoryId);
-        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/wallets")
@@ -143,6 +127,12 @@ public class FinancialManagerController {
     @PostMapping("/wallets/{walletId}/expenses")
     ResponseEntity<ExpenseResponse> createExpense(@PathVariable UUID walletId, @RequestBody ExpenseRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(expenseUseCase.create(walletId, request));
+    }
+
+    @PostMapping("/wallets/{walletId}/expenses/text")
+    ResponseEntity<ExpenseTextResponse> createExpenseFromText(
+            @PathVariable UUID walletId, @RequestBody ExpenseTextRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(expenseTextUseCase.create(walletId, request));
     }
 
     @GetMapping("/wallets/{walletId}/expenses")

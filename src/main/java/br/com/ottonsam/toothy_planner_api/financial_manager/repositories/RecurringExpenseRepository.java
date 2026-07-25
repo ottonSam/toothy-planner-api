@@ -14,7 +14,5 @@ public interface RecurringExpenseRepository extends JpaRepository<RecurringExpen
 
     Optional<RecurringExpenseEntity> findByIdAndWalletIdAndWalletUserId(UUID id, UUID walletId, UUID userId);
 
-    boolean existsByCategoryId(UUID categoryId);
-
     boolean existsByWalletId(UUID walletId);
 }

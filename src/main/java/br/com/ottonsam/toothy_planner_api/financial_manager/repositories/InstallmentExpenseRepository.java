@@ -12,7 +12,5 @@ public interface InstallmentExpenseRepository extends JpaRepository<InstallmentE
 
     Optional<InstallmentExpenseEntity> findByIdAndWalletIdAndWalletUserId(UUID id, UUID walletId, UUID userId);
 
-    boolean existsByCategoryId(UUID categoryId);
-
     boolean existsByWalletId(UUID walletId);
 }

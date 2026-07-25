@@ -21,10 +21,14 @@ public interface ExpenseRepository extends JpaRepository<ExpenseEntity, UUID> {
 
     List<ExpenseEntity> findAllByParentExpenseId(UUID parentExpenseId);
 
+    List<ExpenseEntity> findAllByParentExpenseIdOrderByExpenseDateAscCreatedAtAsc(UUID parentExpenseId);
+
     List<ExpenseEntity> findAllByParentExpenseIdAndCycle_EndsAtGreaterThanEqual(
             UUID parentExpenseId, LocalDate cycleEndDate);
 
     List<ExpenseEntity> findAllByRecurrenceId(UUID recurrenceId);
+
+    List<ExpenseEntity> findAllByRecurrenceIdOrderByExpenseDateAscCreatedAtAsc(UUID recurrenceId);
 
     List<ExpenseEntity> findAllByRecurrenceIdAndCycle_StartsAtAfter(UUID recurrenceId, LocalDate cycleStartDate);
 
@@ -34,8 +38,6 @@ public interface ExpenseRepository extends JpaRepository<ExpenseEntity, UUID> {
     List<ExpenseEntity> findAllByRecurrenceIdAndCycle_EndsAtGreaterThanEqual(UUID recurrenceId, LocalDate cycleEndDate);
 
     Optional<ExpenseEntity> findByIdAndWalletIdAndWalletUserId(UUID id, UUID walletId, UUID userId);
-
-    boolean existsByCategoryId(UUID categoryId);
 
     boolean existsByWalletId(UUID walletId);
 

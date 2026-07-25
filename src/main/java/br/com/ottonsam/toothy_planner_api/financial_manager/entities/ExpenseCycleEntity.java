@@ -44,6 +44,9 @@ public class ExpenseCycleEntity {
     @Column(name = "ends_at", nullable = false)
     @NotNull(message = "Cycle end date is required") private LocalDate endsAt;
 
+    @Column(name = "target_spending_date", nullable = false)
+    @NotNull(message = "Cycle target spending date is required") private LocalDate targetSpendingDate;
+
     @Column(name = "created_at", nullable = false)
     @NotNull(message = "Created at is required") private OffsetDateTime createdAt;
 
@@ -56,23 +59,32 @@ public class ExpenseCycleEntity {
             int referenceMonth,
             int referenceYear,
             LocalDate startsAt,
-            LocalDate endsAt) {
+            LocalDate endsAt,
+            LocalDate targetSpendingDate) {
         this.id = id;
         this.wallet = wallet;
         this.referenceMonth = referenceMonth;
         this.referenceYear = referenceYear;
         this.startsAt = startsAt;
         this.endsAt = endsAt;
+        this.targetSpendingDate = targetSpendingDate;
         this.createdAt = OffsetDateTime.now();
         this.updatedAt = createdAt;
     }
 
     public static ExpenseCycleEntity create(
-            ExpenseWalletEntity wallet, int referenceMonth, int referenceYear, LocalDate startsAt, LocalDate endsAt) {
+            ExpenseWalletEntity wallet,
+            int referenceMonth,
+            int referenceYear,
+            LocalDate startsAt,
+            LocalDate endsAt,
+            LocalDate targetSpendingDate) {
         validateWallet(wallet);
         validateReference(referenceMonth, referenceYear);
         validatePeriod(startsAt, endsAt);
-        return new ExpenseCycleEntity(UUID.randomUUID(), wallet, referenceMonth, referenceYear, startsAt, endsAt);
+        validateTargetSpendingDate(startsAt, endsAt, targetSpendingDate);
+        return new ExpenseCycleEntity(
+                UUID.randomUUID(), wallet, referenceMonth, referenceYear, startsAt, endsAt, targetSpendingDate);
     }
 
     private static void validateWallet(ExpenseWalletEntity wallet) {
@@ -99,6 +111,15 @@ public class ExpenseCycleEntity {
         }
         if (startsAt.isAfter(endsAt)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Cycle start date must be before or equal to end date");
+        }
+    }
+
+    private static void validateTargetSpendingDate(LocalDate startsAt, LocalDate endsAt, LocalDate targetSpendingDate) {
+        if (targetSpendingDate == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Cycle target spending date is required");
+        }
+        if (targetSpendingDate.isBefore(startsAt) || targetSpendingDate.isAfter(endsAt)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Cycle target spending date must be inside cycle period");
         }
     }
 }

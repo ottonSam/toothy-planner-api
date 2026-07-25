@@ -12,6 +12,7 @@ public record ExpenseCycleResponse(
         int referenceYear,
         LocalDate startsAt,
         LocalDate endsAt,
+        LocalDate targetSpendingDate,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt) {
 
@@ -23,6 +24,7 @@ public record ExpenseCycleResponse(
                 cycle.getReferenceYear(),
                 cycle.getStartsAt(),
                 cycle.getEndsAt(),
+                cycle.getTargetSpendingDate(),
                 cycle.getCreatedAt(),
                 cycle.getUpdatedAt());
     }
