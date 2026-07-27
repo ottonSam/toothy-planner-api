@@ -1,0 +1,28 @@
+meta {
+  name: Get Next Card
+  type: http
+  seq: 14
+}
+
+post {
+  url: {{baseUrl}}/api/v1/flashcards/review/next-card
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "deckId": "{{deckId}}"
+  }
+}
+
+vars:pre-request {
+  deckId: 85ad061b-86d3-4331-aca6-6a49225a8626
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  Returns the highest-scored active card from the selected deck.
+  Send an empty body or omit deckId to consider cards from all decks.
+  Expected response: 200 OK.
+}

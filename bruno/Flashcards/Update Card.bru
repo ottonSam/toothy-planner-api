@@ -1,0 +1,50 @@
+meta {
+  name: Update Card
+  type: http
+  seq: 10
+}
+
+put {
+  url: {{baseUrl}}/api/v1/flashcards/cards/{{cardId}}
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "word": "stop",
+    "baseVerb": null,
+    "pastSimple": null,
+    "pastParticiple": null,
+    "expression": null,
+    "translation": "parar",
+    "phonetic": "/stɒp/",
+    "level": "A2",
+    "usageNote": "With a gerund it means ending an action; with an infinitive it means pausing to do something.",
+    "active": true,
+    "examples": [
+      {
+        "text": "I stopped smoking last year.",
+        "translation": "Eu parei de fumar no ano passado."
+      },
+      {
+        "text": "I stopped to smoke outside.",
+        "translation": "Eu parei para fumar lá fora."
+      }
+    ],
+    "tags": [
+      "verbs",
+      "common"
+    ]
+  }
+}
+
+vars:pre-request {
+  cardId: 00000000-0000-0000-0000-000000000000
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  The fields used must match the deck type. Keep unrelated type-specific fields null.
+  Expected response: 200 OK.
+}

@@ -1,0 +1,27 @@
+meta {
+  name: Answer Card
+  type: http
+  seq: 15
+}
+
+post {
+  url: {{baseUrl}}/api/v1/flashcards/cards/{{cardId}}/answer
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "rating": "GOOD"
+  }
+}
+
+vars:pre-request {
+  cardId: 00000000-0000-0000-0000-000000000000
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  Valid ratings: AGAIN, HARD, GOOD and EASY.
+  Expected response: 200 OK with the updated card review data.
+}

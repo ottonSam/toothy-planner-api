@@ -1,0 +1,17 @@
+meta {
+  name: List Tags
+  type: http
+  seq: 12
+}
+
+get {
+  url: {{baseUrl}}/api/v1/flashcards/tags
+  body: none
+  auth: none
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  Lists tags created from AI suggestions for the authenticated user.
+  Expected response: 200 OK.
+}

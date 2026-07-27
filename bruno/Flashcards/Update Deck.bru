@@ -1,0 +1,31 @@
+meta {
+  name: Update Deck
+  type: http
+  seq: 5
+}
+
+put {
+  url: {{baseUrl}}/api/v1/flashcards/decks/{{deckId}}
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "name": "English for Business Travel",
+    "context": "Vocabulary for airports, hotels and business meetings",
+    "targetLanguage": "English",
+    "baseLanguage": "Portuguese",
+    "type": "VOCABULARY"
+  }
+}
+
+vars:pre-request {
+  deckId: 00000000-0000-0000-0000-000000000000
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  Supported types: VOCABULARY, IRREGULAR_VERBS and EXPRESSIONS.
+  Expected response: 200 OK.
+}

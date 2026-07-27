@@ -1,0 +1,46 @@
+meta {
+  name: Create Card
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/api/v1/flashcards/decks/{{deckId}}/cards
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "word": "luggage",
+    "baseVerb": null,
+    "pastSimple": null,
+    "pastParticiple": null,
+    "expression": null,
+    "translation": "bagagem",
+    "phonetic": "/ˈlʌɡɪdʒ/",
+    "level": "A2",
+    "usageNote": "Also called baggage.",
+    "active": true,
+    "examples": [
+      {
+        "text": "My luggage was lost on the flight.",
+        "translation": "Minha bagagem foi perdida no voo."
+      }
+    ],
+    "tags": [
+      "travel",
+      "airport"
+    ]
+  }
+}
+
+vars:pre-request {
+  deckId: 827b7437-51a2-40be-8685-4ce367eaddfa
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  The fields must match the deck type. New cards are always active.
+  Expected response: 201 Created.
+}

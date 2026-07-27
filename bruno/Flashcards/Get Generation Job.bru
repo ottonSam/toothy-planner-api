@@ -1,0 +1,22 @@
+meta {
+  name: Get Generation Job
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/flashcards/generation-jobs/{{jobId}}
+  body: none
+  auth: none
+}
+
+vars:pre-request {
+  jobId: 9112a77b-c6ca-4eca-be54-b8ad46aa0aa1
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  Use the id returned by Generate Deck.
+  The job status can be PENDING, RUNNING, COMPLETED, FAILED, CANCELED or PARTIAL_COMPLETED.
+  Expected response: 200 OK.
+}

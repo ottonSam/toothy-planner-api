@@ -1,0 +1,21 @@
+meta {
+  name: Delete Deck
+  type: http
+  seq: 6
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/flashcards/decks/{{deckId}}
+  body: none
+  auth: none
+}
+
+vars:pre-request {
+  deckId: 85ad061b-86d3-4331-aca6-6a49225a8626
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  Deletes the deck and its cards.
+  Expected response: 204 No Content.
+}

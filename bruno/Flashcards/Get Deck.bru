@@ -1,0 +1,20 @@
+meta {
+  name: Get Deck
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/v1/flashcards/decks/{{deckId}}
+  body: none
+  auth: none
+}
+
+vars:pre-request {
+  deckId: b946286d-a638-486b-8da7-0dfac4c6b960
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  Expected response: 200 OK.
+}

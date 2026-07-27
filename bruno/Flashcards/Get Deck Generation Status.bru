@@ -1,0 +1,21 @@
+meta {
+  name: Get Deck Generation Status
+  type: http
+  seq: 17
+}
+
+get {
+  url: {{baseUrl}}/api/v1/flashcards/decks/{{deckId}}/generation-status
+  body: none
+  auth: none
+}
+
+vars:pre-request {
+  deckId: 827b7437-51a2-40be-8685-4ce367eaddfa
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  Returns the latest generation job and its batches for the selected deck.
+  Expected response: 200 OK.
+}

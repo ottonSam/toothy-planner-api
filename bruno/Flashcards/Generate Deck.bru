@@ -1,0 +1,30 @@
+meta {
+  name: Generate Deck
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/flashcards/decks/generate
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "name": "English for Travel",
+    "context": "Common words used at airports, hotels, restaurants and tourist attractions",
+    "targetLanguage": "English",
+    "baseLanguage": "Portuguese",
+    "type": "VOCABULARY",
+    "cardCount": 200
+  }
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  Creates the deck and starts its asynchronous card generation.
+  Supported types: VOCABULARY, IRREGULAR_VERBS and EXPRESSIONS.
+  Expected response: 202 Accepted with the generation job and its batches.
+}
+​

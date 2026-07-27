@@ -1,0 +1,28 @@
+meta {
+  name: List Deck Cards
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/api/v1/flashcards/decks/{{deckId}}/cards?page={{page}}&size={{size}}
+  body: none
+  auth: none
+}
+
+params:query {
+  page: {{page}}
+  size: {{size}}
+}
+
+vars:pre-request {
+  deckId: 827b7437-51a2-40be-8685-4ce367eaddfa
+  page: 0
+  size: 10
+}
+
+docs {
+  Requires authenticated access_token cookie.
+  Lists the selected deck cards using zero-based pagination.
+  Expected response: 200 OK.
+}

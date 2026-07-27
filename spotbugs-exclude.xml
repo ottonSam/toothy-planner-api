@@ -4,6 +4,7 @@
         <Bug pattern="EI_EXPOSE_REP2" />
         <Or>
             <Class name="~br\.com\.ottonsam\.toothy_planner_api\..*UseCase" />
+            <Class name="~br\.com\.ottonsam\.toothy_planner_api\..*Processor" />
             <Class name="~br\.com\.ottonsam\.toothy_planner_api\..*Controller" />
             <Class name="~br\.com\.ottonsam\.toothy_planner_api\..*Storage" />
             <Class name="br.com.ottonsam.toothy_planner_api.auth.usecases.JwtTokenService" />
