@@ -450,6 +450,16 @@ class FlashcardIntegrationTests {
                 .path("card")
                 .path("id")
                 .asText());
+        var cardsAfterSelection = getJson(userCookie, "/api/v1/flashcards/decks/%s/cards".formatted(deckId))
+                .path("content");
+        var seenCards = 0;
+        for (var card : cardsAfterSelection) {
+            if (!card.path("lastSeenAt").isNull()) {
+                seenCards++;
+                assertThat(card.path("id").asText()).isEqualTo(cardId.toString());
+            }
+        }
+        assertThat(seenCards).isEqualTo(1);
 
         mockMvc.perform(post("/api/v1/flashcards/cards/{cardId}/answer", cardId)
                         .cookie(userCookie)
@@ -479,6 +489,81 @@ class FlashcardIntegrationTests {
                 .andExpect(jsonPath("$.totalWrong").value(1))
                 .andExpect(jsonPath("$.accuracyRate").value(50.00))
                 .andExpect(jsonPath("$.neverSeenCards").value(1));
+    }
+
+    @Test
+    void selectsOnlyActiveCardsFromRequestedOwnedDeckAndReturnsNotFoundWhenNoneRemain() throws Exception {
+        var userCookie = login("flashcards-weighted-owner@example.com");
+        var otherCookie = login("flashcards-weighted-other@example.com");
+        aiClient.enqueue(request -> new FlashcardGenerationAiResult(List.of(vocabulary("airport"))));
+        var firstJobId = createGenerationJob(userCookie, "Weighted", "travel", "VOCABULARY", 1);
+        awaitJob(userCookie, firstJobId);
+        var firstDeckId = jobDeckId(userCookie, firstJobId);
+        var generatedCard = getJson(userCookie, "/api/v1/flashcards/decks/%s/cards".formatted(firstDeckId))
+                .path("content")
+                .get(0);
+
+        var manualCardResponse = mockMvc.perform(post("/api/v1/flashcards/decks/{deckId}/cards", firstDeckId)
+                        .cookie(userCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "word", "hotel",
+                                "translation", "hotel"))))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse();
+        var manualCardId = UUID.fromString(objectMapper
+                .readTree(manualCardResponse.getContentAsString())
+                .path("id")
+                .asText());
+
+        mockMvc.perform(put(
+                                "/api/v1/flashcards/cards/{cardId}",
+                                UUID.fromString(generatedCard.path("id").asText()))
+                        .cookie(userCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "word", generatedCard.path("word").asText(),
+                                "translation", generatedCard.path("translation").asText(),
+                                "active", false))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.active").value(false));
+
+        aiClient.enqueue(request -> new FlashcardGenerationAiResult(List.of(vocabulary("restaurant"))));
+        var secondJobId = createGenerationJob(userCookie, "Other deck", "food", "VOCABULARY", 1);
+        awaitJob(userCookie, secondJobId);
+
+        mockMvc.perform(post("/api/v1/flashcards/review/next-card")
+                        .cookie(userCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("deckId", firstDeckId.toString()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.card.id").value(manualCardId.toString()))
+                .andExpect(jsonPath("$.score").value(BigDecimal.valueOf(50.00)));
+
+        mockMvc.perform(post("/api/v1/flashcards/review/next-card")
+                        .cookie(otherCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("deckId", firstDeckId.toString()))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Flashcard deck not found"));
+
+        mockMvc.perform(put("/api/v1/flashcards/cards/{cardId}", manualCardId)
+                        .cookie(userCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "word", "hotel",
+                                "translation", "hotel",
+                                "active", false))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.active").value(false));
+
+        mockMvc.perform(post("/api/v1/flashcards/review/next-card")
+                        .cookie(userCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("deckId", firstDeckId.toString()))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("No flashcards available for review"));
     }
 
     @Test

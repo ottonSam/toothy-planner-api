@@ -18,7 +18,6 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -33,6 +32,7 @@ public class FlashcardReviewUseCase {
     private final FlashcardReviewAnswerRepository answerRepository;
     private final FlashcardDeckUseCase deckUseCase;
     private final FlashcardCardUseCase cardUseCase;
+    private final FlashcardWeightedSelector weightedSelector;
     private final CurrentUserProvider currentUserProvider;
     private final Clock clock;
 
@@ -41,12 +41,14 @@ public class FlashcardReviewUseCase {
             FlashcardReviewAnswerRepository answerRepository,
             FlashcardDeckUseCase deckUseCase,
             FlashcardCardUseCase cardUseCase,
+            FlashcardWeightedSelector weightedSelector,
             CurrentUserProvider currentUserProvider,
             Clock clock) {
         this.cardRepository = cardRepository;
         this.answerRepository = answerRepository;
         this.deckUseCase = deckUseCase;
         this.cardUseCase = cardUseCase;
+        this.weightedSelector = weightedSelector;
         this.currentUserProvider = currentUserProvider;
         this.clock = clock;
     }
@@ -63,15 +65,17 @@ public class FlashcardReviewUseCase {
                 ? cardsFromDeck(user.getId(), request.deckId())
                 : cardRepository.findAllByUserIdAndActiveTrue(user.getId());
         var now = OffsetDateTime.now(clock);
-        var scored = cards.stream()
-                .map(card -> new ScoredCard(card, score(card, now)))
-                .max(Comparator.comparing(ScoredCard::score))
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "No flashcards available for review"));
-        scored.card().markSeen(now);
-        cardRepository.save(scored.card());
+        if (cards.isEmpty()) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "No flashcards available for review");
+        }
+        var selected = weightedSelector.select(cards.stream()
+                .map(card -> new WeightedFlashcardCandidate(card, score(card, now)))
+                .toList());
+        selected.card().markSeen(now);
+        cardRepository.save(selected.card());
         return new FlashcardNextCardResponse(
-                FlashcardCardResponse.from(scored.card()),
-                BigDecimal.valueOf(scored.score()).setScale(2, RoundingMode.HALF_UP));
+                FlashcardCardResponse.from(selected.card()),
+                BigDecimal.valueOf(selected.score()).setScale(2, RoundingMode.HALF_UP));
     }
 
     public FlashcardCardResponse answer(UUID cardId, FlashcardAnswerRequest request) {
@@ -97,7 +101,7 @@ public class FlashcardReviewUseCase {
 
         if (card.getLastSeenAt() == null) {
             score += 50.0;
-            return score;
+            return Math.max(1.0, score);
         }
         var sinceSeen = Duration.between(card.getLastSeenAt(), now);
         var daysSinceLastSeen = Math.min(30, Math.max(0, sinceSeen.toDays()));
@@ -107,7 +111,7 @@ public class FlashcardReviewUseCase {
         } else if (card.getLastSeenAt().toLocalDate().isEqual(now.toLocalDate())) {
             score -= 10.0;
         }
-        return score;
+        return Math.max(1.0, score);
     }
 
     private List<FlashcardEntity> cardsFromDeck(UUID userId, UUID deckId) {
@@ -121,6 +125,4 @@ public class FlashcardReviewUseCase {
         }
         return request.rating();
     }
-
-    private record ScoredCard(FlashcardEntity card, double score) {}
 }

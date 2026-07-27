@@ -486,7 +486,7 @@ Resposta esperada para `EXPRESSIONS`:
 A revisao deve funcionar de forma incremental.
 
 O frontend deve solicitar o proximo card a ser revisado, a API deve calcular o
-score dos cards disponiveis e retornar apenas o card com maior prioridade.
+score dos cards disponiveis e sortear um card usando o score como peso.
 
 Nao deve ser usado `GET` para selecionar o proximo card quando isso atualizar
 `lastSeenAt`.
@@ -534,7 +534,8 @@ Regras:
 
 - A API deve selecionar apenas cards ativos do usuario.
 - A API deve calcular o score dos cards candidatos.
-- A API deve retornar o card com maior score.
+- A API deve sortear o card proporcionalmente ao score de cada candidato.
+- Cards com score menor devem continuar tendo chance de ser selecionados.
 - A API deve atualizar `lastSeenAt` do card retornado.
 - Cards nunca vistos devem receber score alto.
 - Cards vistos recentemente devem receber penalidade no score para evitar
@@ -648,8 +649,13 @@ Regras:
 - Cards vistos ha menos de alguns minutos devem receber penalidade forte.
 - Cards vistos no mesmo dia devem receber penalidade menor.
 - O bonus por dias desde `lastSeenAt` deve ter teto configuravel.
-- O algoritmo pode evoluir depois, mas a primeira versao deve ser deterministica
-  e testavel.
+- O score minimo usado como peso deve ser `1`.
+- A proxima carta deve ser sorteada aleatoriamente usando o score como peso.
+- A probabilidade de uma carta deve ser o score da carta dividido pela soma dos
+  scores de todas as cartas candidatas.
+- Uma carta com score menor deve continuar tendo chance de ser selecionada.
+- O sorteio ponderado deve permitir uma fonte de aleatoriedade controlada nos
+  testes.
 
 ## Metricas
 
@@ -730,7 +736,7 @@ Devem ser criados testes cobrindo:
 - usuario nao acessa deck de outro usuario.
 - usuario nao acessa job de outro usuario.
 - usuario nao acessa card de outro usuario.
-- retorna proximo card por score.
+- retorna proximo card por sorteio ponderado pelo score.
 - retorna proximo card filtrando por deck quando `deckId` for informado.
 - retorna proximo card considerando todos os decks quando `deckId` for omitido.
 - atualiza `lastSeenAt` ao entregar o proximo card.
@@ -740,6 +746,8 @@ Devem ser criados testes cobrindo:
 - score considera `wrongCount`, `difficulty`, `consecutiveWrong` e tempo desde
   `lastSeenAt`.
 - score penaliza cards vistos recentemente.
+- sorteio permite selecionar cards com score menor.
+- apenas o card sorteado tem `lastSeenAt` atualizado.
 - registra resposta `AGAIN`.
 - registra resposta `HARD`.
 - registra resposta `GOOD`.
