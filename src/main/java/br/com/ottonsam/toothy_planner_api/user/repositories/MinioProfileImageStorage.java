@@ -13,11 +13,13 @@ import io.minio.StatObjectArgs;
 import java.io.ByteArrayInputStream;
 import java.util.Optional;
 import java.util.UUID;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Repository;
 
 @Repository
+@Slf4j
 public class MinioProfileImageStorage implements ProfileImageStorage {
 
     private final MinioClient minioClient;
@@ -39,6 +41,7 @@ public class MinioProfileImageStorage implements ProfileImageStorage {
                     .build());
             return key;
         } catch (Exception exception) {
+            log.error("Unable to store profile image for user {} in bucket {}", userId, bucket, exception);
             throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "Unable to store profile image");
         }
     }
