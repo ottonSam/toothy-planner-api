@@ -12,7 +12,7 @@ post {
 
 body:json {
   {
-    "text": "Parcelei um notebook em 12 vezes 240,35",
+    "text": "Gastei 80 no mercado, 35 na farmacia e parcelei um notebook em 12 vezes de 240,35",
     "referenceDate": "2026-07-30"
   }
 }
@@ -23,6 +23,7 @@ vars:pre-request {
 
 docs {
   Requires authenticated access_token cookie.
-  Uses DeepSeek to classify category and expense type, then creates the expense directly.
-  Expected response: 201 Created.
+  Uses DeepSeek to separate, normalize and classify up to 50 expenses.
+  Creates all items atomically in internal batches of 25.
+  Expected response: 201 Created with expenseCount, generatedExpenseCount, items and generatedExpenses.
 }

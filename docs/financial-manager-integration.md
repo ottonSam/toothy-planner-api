@@ -178,48 +178,87 @@ A edicao manual permite alterar `category`, `description`, `amount` e
 
 ```json
 {
-  "text": "fui ao mercado e gastei 32 reais",
+  "text": "gastei 32 reais no mercado e 20 reais na farmacia",
   "referenceDate": "2026-07-13"
 }
 ```
 
 `referenceDate` e opcional. Quando omitido, a API usa a data atual.
 
-A API chama DeepSeek, classifica categoria e tipo de gasto, cria o registro sem
-pre-confirmacao e retorna o que foi criado.
+A API chama DeepSeek uma vez para separar, normalizar e classificar todos os
+gastos do texto. As classificacoes sao validadas antes da persistencia e sao
+processadas em lotes internos de ate 25 itens, com limite de 50 gastos por
+texto. A operacao e atomica: qualquer falha impede a criacao de todos os itens.
 
-Resposta para gasto pontual:
+Resposta:
 
 ```json
 {
-  "type": "ONE_TIME",
-  "expense": {
-    "id": "93288efd-a6d5-4a25-ac6c-c115551ffe8c",
-    "category": {
-      "key": "ALIMENTACAO",
-      "name": "Alimentacao",
-      "color": "#16A34A",
-      "icon": "utensils"
+  "expenseCount": 2,
+  "generatedExpenseCount": 2,
+  "items": [
+    {
+      "sourceText": "32 reais no mercado",
+      "type": "ONE_TIME",
+      "expense": {
+        "id": "93288efd-a6d5-4a25-ac6c-c115551ffe8c",
+        "description": "Mercado",
+        "amount": 32.00,
+        "expenseDate": "2026-07-13",
+        "type": "ONE_TIME",
+        "source": "AI_TEXT"
+      },
+      "installmentExpense": null,
+      "recurringExpense": null,
+      "generatedExpenses": [
+        {
+          "id": "93288efd-a6d5-4a25-ac6c-c115551ffe8c",
+          "description": "Mercado",
+          "amount": 32.00,
+          "expenseDate": "2026-07-13",
+          "type": "ONE_TIME",
+          "source": "AI_TEXT"
+        }
+      ]
     },
-    "description": "Mercado",
-    "amount": 32.00,
-    "expenseDate": "2026-07-13",
-    "type": "ONE_TIME",
-    "source": "AI_TEXT"
-  },
-  "installmentExpense": null,
-  "recurringExpense": null,
+    {
+      "sourceText": "20 reais na farmacia",
+      "type": "ONE_TIME",
+      "expense": {
+        "id": "b9ced251-761e-4793-823a-bba1a3932cc4",
+        "description": "Farmacia",
+        "amount": 20.00,
+        "expenseDate": "2026-07-13",
+        "type": "ONE_TIME",
+        "source": "AI_TEXT"
+      },
+      "installmentExpense": null,
+      "recurringExpense": null,
+      "generatedExpenses": [
+        {
+          "id": "b9ced251-761e-4793-823a-bba1a3932cc4",
+          "description": "Farmacia",
+          "amount": 20.00,
+          "expenseDate": "2026-07-13",
+          "type": "ONE_TIME",
+          "source": "AI_TEXT"
+        }
+      ]
+    }
+  ],
   "generatedExpenses": [
     {
       "id": "93288efd-a6d5-4a25-ac6c-c115551ffe8c",
-      "category": {
-        "key": "ALIMENTACAO",
-        "name": "Alimentacao",
-        "color": "#16A34A",
-        "icon": "utensils"
-      },
       "description": "Mercado",
       "amount": 32.00,
+      "expenseDate": "2026-07-13",
+      "type": "ONE_TIME",
+      "source": "AI_TEXT"
+    },
+    {
+      "id": "b9ced251-761e-4793-823a-bba1a3932cc4",
+      "description": "Farmacia",
+      "amount": 20.00,
       "expenseDate": "2026-07-13",
       "type": "ONE_TIME",
       "source": "AI_TEXT"
@@ -228,10 +267,14 @@ Resposta para gasto pontual:
 }
 ```
 
-Para textos parcelados, `installmentExpense` vem preenchido e
-`generatedExpenses` contem as parcelas criadas. Para textos recorrentes,
-`recurringExpense` vem preenchido e `generatedExpenses` contem as recorrencias
-geradas para ciclos existentes.
+Cada item preserva em `sourceText` o trecho que originou a classificacao. Para
+itens parcelados, `installmentExpense` vem preenchido e `generatedExpenses`
+contem as parcelas. Para itens recorrentes, `recurringExpense` vem preenchido e
+`generatedExpenses` contem as recorrencias dos ciclos existentes. A lista
+agregada na raiz contem todas as ocorrencias criadas, na ordem dos itens.
+
+Texto sem gasto identificavel retorna `422`. Falhas ou respostas invalidas da
+IA retornam `502`. Nenhum gasto e persistido nesses casos.
 
 ## Ditado de gastos no frontend
 

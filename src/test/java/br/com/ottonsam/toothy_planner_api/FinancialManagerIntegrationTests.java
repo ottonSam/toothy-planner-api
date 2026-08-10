@@ -30,9 +30,11 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.ArrayDeque;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -389,10 +391,12 @@ class FinancialManagerIntegrationTests {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("text", "fui ao mercado e gastei 32 reais"))))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.type").value("ONE_TIME"))
-                .andExpect(jsonPath("$.expense.category.key").value("ALIMENTACAO"))
-                .andExpect(jsonPath("$.expense.source").value("AI_TEXT"))
-                .andExpect(jsonPath("$.expense.expenseDate").value("2026-07-13"))
+                .andExpect(jsonPath("$.expenseCount").value(1))
+                .andExpect(jsonPath("$.generatedExpenseCount").value(1))
+                .andExpect(jsonPath("$.items[0].type").value("ONE_TIME"))
+                .andExpect(jsonPath("$.items[0].expense.category.key").value("ALIMENTACAO"))
+                .andExpect(jsonPath("$.items[0].expense.source").value("AI_TEXT"))
+                .andExpect(jsonPath("$.items[0].expense.expenseDate").value("2026-07-13"))
                 .andExpect(jsonPath("$.generatedExpenses.length()").value(1));
 
         expenseTextAiClient.enqueue(new ExpenseTextClassification(
@@ -412,8 +416,9 @@ class FinancialManagerIntegrationTests {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("text", "comprei algo parcelado em 12 vezes de 199"))))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.type").value("INSTALLMENT"))
-                .andExpect(jsonPath("$.installmentExpense.category.key").value("COMPRAS"))
+                .andExpect(jsonPath("$.items[0].type").value("INSTALLMENT"))
+                .andExpect(
+                        jsonPath("$.items[0].installmentExpense.category.key").value("COMPRAS"))
                 .andExpect(jsonPath("$.generatedExpenses.length()").value(12))
                 .andExpect(jsonPath("$.generatedExpenses[0].source").value("AI_TEXT"));
 
@@ -434,9 +439,157 @@ class FinancialManagerIntegrationTests {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("text", "contratei um plano de internet de 100 reais"))))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.type").value("RECURRING"))
-                .andExpect(jsonPath("$.recurringExpense.startsAt").value("2026-07-13"))
+                .andExpect(jsonPath("$.items[0].type").value("RECURRING"))
+                .andExpect(jsonPath("$.items[0].recurringExpense.startsAt").value("2026-07-13"))
                 .andExpect(jsonPath("$.generatedExpenses[0].source").value("AI_TEXT"));
+    }
+
+    @Test
+    void separatesNormalizesAndCreatesMixedExpensesFromOneText() throws Exception {
+        var userCookie = login("financial-ai-text-batch@example.com");
+        var walletId = createWallet(userCookie, "Carteira IA em lote", 4000, "2026-06-16", 15);
+
+        expenseTextAiClient.enqueueAll(List.of(
+                new ExpenseTextClassification(
+                        ExpenseTextType.RECURRING,
+                        ExpenseCategory.SERVICOS,
+                        "Streaming",
+                        BigDecimal.valueOf(30),
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        LocalDate.parse("2026-07-13"),
+                        "streaming mensal de 30 reais"),
+                new ExpenseTextClassification(
+                        ExpenseTextType.ONE_TIME,
+                        ExpenseCategory.ALIMENTACAO,
+                        "Mercado",
+                        BigDecimal.valueOf(80),
+                        LocalDate.parse("2026-07-12"),
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        "mercado de 80 reais ontem"),
+                new ExpenseTextClassification(
+                        ExpenseTextType.INSTALLMENT,
+                        ExpenseCategory.COMPRAS,
+                        "Notebook",
+                        BigDecimal.valueOf(200),
+                        null,
+                        null,
+                        null,
+                        3,
+                        LocalDate.parse("2026-07-13"),
+                        null,
+                        "notebook em 3 vezes de 200")));
+
+        mockMvc.perform(post("/api/v1/financial-manager/wallets/{walletId}/expenses/text", walletId)
+                        .cookie(userCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "text",
+                                "Assinei streaming por 30 mensais, ontem gastei 80 no mercado e comprei um notebook em 3 vezes de 200",
+                                "referenceDate",
+                                "2026-07-13"))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.expenseCount").value(3))
+                .andExpect(jsonPath("$.generatedExpenseCount").value(7))
+                .andExpect(jsonPath("$.items[0].sourceText").value("streaming mensal de 30 reais"))
+                .andExpect(jsonPath("$.items[0].type").value("RECURRING"))
+                .andExpect(jsonPath("$.items[0].generatedExpenses.length()").value(3))
+                .andExpect(jsonPath("$.items[0].generatedExpenses[2].source").value("AI_TEXT"))
+                .andExpect(jsonPath("$.items[1].expense.description").value("Mercado"))
+                .andExpect(jsonPath("$.items[2].type").value("INSTALLMENT"))
+                .andExpect(jsonPath("$.items[2].generatedExpenses.length()").value(3))
+                .andExpect(jsonPath("$.generatedExpenses.length()").value(7));
+    }
+
+    @Test
+    void createsTextExpensesAcrossInternalBatchesAndRejectsMoreThanTheLimit() throws Exception {
+        var userCookie = login("financial-ai-text-limit@example.com");
+        var walletId = createWallet(userCookie, "Carteira IA limite", 10000, "2026-06-16", 15);
+        var classifications = IntStream.rangeClosed(1, 26)
+                .mapToObj(index -> new ExpenseTextClassification(
+                        ExpenseTextType.ONE_TIME,
+                        ExpenseCategory.OUTROS,
+                        "Gasto " + index,
+                        BigDecimal.valueOf(index),
+                        LocalDate.parse("2026-07-13"),
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        "gasto " + index))
+                .toList();
+        expenseTextAiClient.enqueueAll(classifications);
+
+        mockMvc.perform(post("/api/v1/financial-manager/wallets/{walletId}/expenses/text", walletId)
+                        .cookie(userCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("text", "26 gastos identificados"))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.expenseCount").value(26))
+                .andExpect(jsonPath("$.generatedExpenseCount").value(26))
+                .andExpect(jsonPath("$.items[25].expense.description").value("Gasto 26"));
+
+        expenseTextAiClient.enqueueAll(IntStream.rangeClosed(1, 51)
+                .mapToObj(index -> new ExpenseTextClassification(
+                        ExpenseTextType.ONE_TIME,
+                        ExpenseCategory.OUTROS,
+                        "Excedente " + index,
+                        BigDecimal.ONE,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null))
+                .toList());
+
+        mockMvc.perform(post("/api/v1/financial-manager/wallets/{walletId}/expenses/text", walletId)
+                        .cookie(userCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("text", "51 gastos identificados"))))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message").value("Expense text supports at most 50 expenses"));
+
+        var expenses = getJson(userCookie, "/api/v1/financial-manager/wallets/%s/expenses".formatted(walletId));
+        assertThat(expenses).hasSize(26);
+    }
+
+    @Test
+    void rejectsTextExpensesForAWalletOwnedByAnotherUser() throws Exception {
+        var ownerCookie = login("financial-ai-owner@example.com");
+        var otherCookie = login("financial-ai-other@example.com");
+        var walletId = createWallet(ownerCookie, "Carteira privada IA", 1000, "2026-06-16", 15);
+        expenseTextAiClient.enqueue(new ExpenseTextClassification(
+                ExpenseTextType.ONE_TIME,
+                ExpenseCategory.ALIMENTACAO,
+                "Mercado",
+                BigDecimal.TEN,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null));
+
+        mockMvc.perform(post("/api/v1/financial-manager/wallets/{walletId}/expenses/text", walletId)
+                        .cookie(otherCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("text", "mercado de 10 reais"))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Wallet not found"));
+
+        mockMvc.perform(get("/api/v1/financial-manager/wallets/{walletId}/expenses", walletId)
+                        .cookie(ownerCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isEmpty());
     }
 
     @Test
@@ -455,6 +608,21 @@ class FinancialManagerIntegrationTests {
     void rejectsInvalidRequestsAndDoesNotSaveWhenAiFails() throws Exception {
         var userCookie = login("financial-validation@example.com");
         var walletId = createWallet(userCookie, "Carteira validacoes", 1000, "2026-06-16", 15);
+
+        mockMvc.perform(post("/api/v1/financial-manager/wallets/{walletId}/expenses/text", walletId)
+                        .cookie(userCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("text", "  "))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Expense text is required"));
+
+        expenseTextAiClient.enqueueAll(List.of());
+        mockMvc.perform(post("/api/v1/financial-manager/wallets/{walletId}/expenses/text", walletId)
+                        .cookie(userCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("text", "Hoje foi um dia tranquilo"))))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message").value("No expenses were identified in the text"));
 
         mockMvc.perform(post("/api/v1/financial-manager/wallets/{walletId}/installment-expenses", walletId)
                         .cookie(userCookie)
@@ -496,6 +664,84 @@ class FinancialManagerIntegrationTests {
                 .andExpect(jsonPath("$.message").value(containsString("INSTALLMENT requires installments")))
                 .andExpect(jsonPath("$.message").value(containsString("amount=199")))
                 .andExpect(jsonPath("$.message").value(containsString("installments=null")));
+
+        expenseTextAiClient.enqueueAll(List.of(
+                new ExpenseTextClassification(
+                        ExpenseTextType.ONE_TIME,
+                        ExpenseCategory.ALIMENTACAO,
+                        "Gasto valido",
+                        BigDecimal.TEN,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null),
+                new ExpenseTextClassification(
+                        ExpenseTextType.ONE_TIME,
+                        ExpenseCategory.OUTROS,
+                        "Gasto invalido",
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null)));
+        mockMvc.perform(post("/api/v1/financial-manager/wallets/{walletId}/expenses/text", walletId)
+                        .cookie(userCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("text", "um gasto valido e outro sem valor"))))
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.message").value(containsString("ONE_TIME requires amount")));
+
+        expenseTextAiClient.enqueue(new ExpenseTextClassification(
+                ExpenseTextType.ONE_TIME,
+                ExpenseCategory.OUTROS,
+                "Gasto negativo",
+                BigDecimal.valueOf(-1),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null));
+        mockMvc.perform(post("/api/v1/financial-manager/wallets/{walletId}/expenses/text", walletId)
+                        .cookie(userCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("text", "gasto negativo"))))
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.message").value(containsString("amount must be greater than zero")));
+
+        expenseTextAiClient.enqueueAll(List.of(
+                new ExpenseTextClassification(
+                        ExpenseTextType.ONE_TIME,
+                        ExpenseCategory.ALIMENTACAO,
+                        "Primeiro gasto",
+                        BigDecimal.TEN,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null),
+                new ExpenseTextClassification(
+                        ExpenseTextType.ONE_TIME,
+                        ExpenseCategory.OUTROS,
+                        "Gasto anterior a carteira",
+                        BigDecimal.ONE,
+                        LocalDate.parse("2026-06-15"),
+                        null,
+                        null,
+                        null,
+                        null,
+                        null)));
+        mockMvc.perform(post("/api/v1/financial-manager/wallets/{walletId}/expenses/text", walletId)
+                        .cookie(userCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("text", "um gasto valido e outro anterior a carteira"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Expense date must be on or after wallet start date"));
 
         expenseTextAiClient.failNext();
         mockMvc.perform(post("/api/v1/financial-manager/wallets/{walletId}/expenses/text", walletId)
@@ -673,11 +919,11 @@ class FinancialManagerIntegrationTests {
 
     static class FakeExpenseTextAiClient implements ExpenseTextAiClient {
 
-        private final ArrayDeque<ExpenseTextClassification> classifications = new ArrayDeque<>();
+        private final ArrayDeque<List<ExpenseTextClassification>> classifications = new ArrayDeque<>();
         private boolean failNext;
 
         @Override
-        public ExpenseTextClassification classify(String text, LocalDate referenceDate) {
+        public List<ExpenseTextClassification> classify(String text, LocalDate referenceDate) {
             if (failNext) {
                 failNext = false;
                 throw new ApiException(
@@ -687,7 +933,11 @@ class FinancialManagerIntegrationTests {
         }
 
         void enqueue(ExpenseTextClassification classification) {
-            classifications.add(classification);
+            classifications.add(List.of(classification));
+        }
+
+        void enqueueAll(List<ExpenseTextClassification> batch) {
+            classifications.add(List.copyOf(batch));
         }
 
         void failNext() {

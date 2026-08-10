@@ -14,4 +14,31 @@ public record ExpenseTextClassification(
         BigDecimal installmentAmount,
         Integer installments,
         LocalDate firstExpenseDate,
-        LocalDate startsAt) {}
+        LocalDate startsAt,
+        String sourceText) {
+
+    public ExpenseTextClassification(
+            ExpenseTextType type,
+            ExpenseCategory category,
+            String description,
+            BigDecimal amount,
+            LocalDate expenseDate,
+            BigDecimal totalAmount,
+            BigDecimal installmentAmount,
+            Integer installments,
+            LocalDate firstExpenseDate,
+            LocalDate startsAt) {
+        this(
+                type,
+                category,
+                description,
+                amount,
+                expenseDate,
+                totalAmount,
+                installmentAmount,
+                installments,
+                firstExpenseDate,
+                startsAt,
+                description);
+    }
+}

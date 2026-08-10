@@ -2,20 +2,16 @@ package br.com.ottonsam.toothy_planner_api.financial_manager.dtos;
 
 import java.util.List;
 
-public record ExpenseTextResponse(
-        int expenseCount,
-        int generatedExpenseCount,
-        List<ExpenseTextItemResponse> items,
+public record ExpenseTextItemResponse(
+        String sourceText,
+        String type,
+        ExpenseResponse expense,
+        InstallmentExpenseResponse installmentExpense,
+        RecurringExpenseResponse recurringExpense,
         List<ExpenseResponse> generatedExpenses) {
 
-    public ExpenseTextResponse {
-        items = List.copyOf(items);
+    public ExpenseTextItemResponse {
         generatedExpenses = List.copyOf(generatedExpenses);
-    }
-
-    @Override
-    public List<ExpenseTextItemResponse> items() {
-        return List.copyOf(items);
     }
 
     @Override
