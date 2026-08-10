@@ -17,15 +17,10 @@ services:
       SPRING_FLYWAY_USER: ${POSTGRES_USER}
       SPRING_FLYWAY_PASSWORD: ${POSTGRES_PASSWORD}
       MINIO_ENDPOINT: http://minio:${MINIO_API_CONTAINER_PORT}
-      TRANSCRIPTION_BASE_URL: ${TRANSCRIPTION_BASE_URL:-http://audio-transcriber:8000}
-      TRANSCRIPTION_TIMEOUT_SECONDS: ${TRANSCRIPTION_TIMEOUT_SECONDS:-120}
-      TRANSCRIPTION_MAX_AUDIO_BYTES: ${TRANSCRIPTION_MAX_AUDIO_BYTES:-10485760}
     depends_on:
       postgres:
         condition: service_healthy
       minio:
-        condition: service_started
-      audio-transcriber:
         condition: service_started
 
   postgres:
@@ -60,17 +55,3 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     volumes:
       - ${MINIO_DATA_PATH}:${MINIO_CONTAINER_DATA_PATH}
-
-  audio-transcriber:
-    build:
-      context: ./audio-transcriber
-      dockerfile: Dockerfile
-    container_name: ${AUDIO_TRANSCRIBER_CONTAINER_NAME:-toothy-planner-audio-transcriber}
-    restart: unless-stopped
-    environment:
-      FASTER_WHISPER_MODEL: ${FASTER_WHISPER_MODEL:-small}
-      FASTER_WHISPER_DEVICE: ${FASTER_WHISPER_DEVICE:-cpu}
-      FASTER_WHISPER_COMPUTE_TYPE: ${FASTER_WHISPER_COMPUTE_TYPE:-int8}
-      FASTER_WHISPER_LANGUAGE: ${FASTER_WHISPER_LANGUAGE:-pt}
-    expose:
-      - "8000"
