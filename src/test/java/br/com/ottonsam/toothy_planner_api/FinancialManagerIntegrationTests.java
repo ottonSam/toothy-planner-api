@@ -923,7 +923,7 @@ class FinancialManagerIntegrationTests {
         private boolean failNext;
 
         @Override
-        public List<ExpenseTextClassification> classify(String text, LocalDate referenceDate) {
+        public List<ExpenseTextClassification> classify(UUID userId, String text, LocalDate referenceDate) {
             if (failNext) {
                 failNext = false;
                 throw new ApiException(
@@ -968,7 +968,7 @@ class FinancialManagerIntegrationTests {
         @Bean
         @Primary
         WeeklyReportAiClient weeklyReportAiClient() {
-            return prompt -> "# Relatorio Semanal de Desempenho\n\n## Resumo\nRelatorio gerado.";
+            return (userId, prompt) -> "# Relatorio Semanal de Desempenho\n\n## Resumo\nRelatorio gerado.";
         }
 
         @Bean

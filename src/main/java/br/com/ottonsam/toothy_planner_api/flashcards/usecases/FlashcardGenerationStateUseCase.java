@@ -40,6 +40,7 @@ public class FlashcardGenerationStateUseCase {
         jobRepository.save(job);
         return new FlashcardGenerationJobContext(
                 job.getId(),
+                job.getUser().getId(),
                 job.getDeck().getId(),
                 job.getType(),
                 job.getContext(),
@@ -123,7 +124,13 @@ public class FlashcardGenerationStateUseCase {
 }
 
 record FlashcardGenerationJobContext(
-        UUID jobId, UUID deckId, FlashcardDeckType type, String context, String targetLanguage, String baseLanguage) {}
+        UUID jobId,
+        UUID userId,
+        UUID deckId,
+        FlashcardDeckType type,
+        String context,
+        String targetLanguage,
+        String baseLanguage) {}
 
 record FlashcardGenerationBatchContext(
         UUID batchId, int requestedCount, int createdCount, FlashcardGenerationStatus status) {}

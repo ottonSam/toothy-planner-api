@@ -506,7 +506,7 @@ class GoalCalendarManagementIntegrationTests {
         private String lastPrompt;
 
         @Override
-        public String generate(String prompt) {
+        public String generate(UUID userId, String prompt) {
             lastPrompt = prompt;
             return "# Avaliacao da Semana\n\n## Recomendacao para a Proxima Semana\nRelatorio gerado.";
         }

@@ -65,8 +65,9 @@ public class ExpenseTextUseCase {
     ExpenseTextResponse create(UUID walletId, ExpenseTextRequest request, ExpenseSource source) {
         var text = requiredText(request);
         var referenceDate = request.referenceDate() == null ? LocalDate.now(clock) : request.referenceDate();
-        walletUseCase.findOwned(walletId, currentUserProvider.get().getId());
-        var classifications = aiClient.classify(text, referenceDate);
+        var userId = currentUserProvider.get().getId();
+        walletUseCase.findOwned(walletId, userId);
+        var classifications = aiClient.classify(userId, text, referenceDate);
         validateClassifications(classifications);
 
         var items = new ArrayList<ExpenseTextItemResponse>(classifications.size());

@@ -84,7 +84,7 @@ public class WeeklyPerformanceReportUseCase {
         validateNotDuplicate(calendarId, week);
         var metrics = buildMetrics(calendar, week, weekStartsAt, weekEndsAt);
         var previousReports = previousReports(calendarId, week);
-        var markdown = aiClient.generate(buildPrompt(metrics, previousReports, requiredUserFeedback));
+        var markdown = aiClient.generate(user.getId(), buildPrompt(metrics, previousReports, requiredUserFeedback));
         var report = WeeklyPerformanceReportEntity.create(
                 calendar, week, weekStartsAt, weekEndsAt, requiredUserFeedback, toJson(metrics), markdown);
         return WeeklyPerformanceReportResponse.from(reportRepository.save(report), objectMapper);

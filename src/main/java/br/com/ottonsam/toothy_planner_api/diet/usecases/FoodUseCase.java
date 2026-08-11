@@ -60,7 +60,7 @@ public class FoodUseCase {
     }
 
     private FoodEntity createFromDeepSeek(String normalizedName, UserEntity user) {
-        var nutrition = foodNutritionAiClient.lookup(normalizedName);
+        var nutrition = foodNutritionAiClient.lookup(user.getId(), normalizedName);
         var food = FoodEntity.create(
                 normalizedName,
                 nutrition.perGram().kcal(),

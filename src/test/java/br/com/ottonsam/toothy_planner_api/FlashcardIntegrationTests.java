@@ -822,7 +822,7 @@ class FlashcardIntegrationTests {
         private int sequence;
 
         @Override
-        public FlashcardGenerationAiResult generate(FlashcardGenerationAiRequest request) {
+        public FlashcardGenerationAiResult generate(UUID userId, FlashcardGenerationAiRequest request) {
             requests.add(request);
             if (!responses.isEmpty()) {
                 return responses.removeFirst().apply(request);

@@ -98,13 +98,15 @@ public class FlashcardGenerationProcessor {
         for (var attempt = 1; attempt <= maxRetriesPerRequest + 1; attempt++) {
             try {
                 var alreadyGeneratedTerms = cardUseCase.targetTerms(job.deckId());
-                var generated = aiClient.generate(new FlashcardGenerationAiRequest(
-                        job.type(),
-                        job.context(),
-                        job.targetLanguage(),
-                        job.baseLanguage(),
-                        requestedCount,
-                        alreadyGeneratedTerms));
+                var generated = aiClient.generate(
+                        job.userId(),
+                        new FlashcardGenerationAiRequest(
+                                job.type(),
+                                job.context(),
+                                job.targetLanguage(),
+                                job.baseLanguage(),
+                                requestedCount,
+                                alreadyGeneratedTerms));
                 return new FlashcardAiCallResult(generated, null);
             } catch (RuntimeException exception) {
                 lastException = exception;

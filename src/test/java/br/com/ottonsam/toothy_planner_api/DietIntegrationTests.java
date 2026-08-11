@@ -365,7 +365,7 @@ class DietIntegrationTests {
         private final Map<String, Integer> calls = new HashMap<>();
 
         @Override
-        public FoodNutritionData lookup(String foodName) {
+        public FoodNutritionData lookup(UUID userId, String foodName) {
             calls.merge(foodName, 1, Integer::sum);
             if ("FALHA".equals(foodName)) {
                 throw new ApiException(HttpStatus.BAD_GATEWAY, "DeepSeek nutrition lookup failed");
@@ -416,7 +416,7 @@ class DietIntegrationTests {
         @Bean
         @Primary
         WeeklyReportAiClient weeklyReportAiClient() {
-            return prompt -> "# Relatorio Semanal de Desempenho\n\n## Resumo\nRelatorio gerado.";
+            return (userId, prompt) -> "# Relatorio Semanal de Desempenho\n\n## Resumo\nRelatorio gerado.";
         }
 
         @Bean

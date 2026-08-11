@@ -56,7 +56,7 @@ public class InstallmentExpenseUseCase {
         var user = currentUserProvider.get();
         var wallet = walletUseCase.findOwned(walletId, user.getId());
         var category = categoryUseCase.required(request.category());
-        var installmentExpense = installmentExpenseRepository.save(InstallmentExpenseEntity.create(
+        var installmentExpense = installmentExpenseRepository.saveAndFlush(InstallmentExpenseEntity.create(
                 wallet,
                 category,
                 request.description(),

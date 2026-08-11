@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 class DeepSeekFlashcardGenerationAiClientTests {
 
     private final DeepSeekFlashcardGenerationAiClient client =
-            new DeepSeekFlashcardGenerationAiClient(new ObjectMapper(), "test-key", "http://localhost", "test", 1);
+            new DeepSeekFlashcardGenerationAiClient(new ObjectMapper(), null);
 
     @Test
     void requiresCardsArrayInSystemPrompt() {

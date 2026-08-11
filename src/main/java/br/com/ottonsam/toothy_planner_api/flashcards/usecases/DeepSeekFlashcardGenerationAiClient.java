@@ -1,85 +1,49 @@
 package br.com.ottonsam.toothy_planner_api.flashcards.usecases;
 
+import br.com.ottonsam.toothy_planner_api.ai_usage.entities.AiFeature;
+import br.com.ottonsam.toothy_planner_api.ai_usage.usecases.DeepSeekChatCompletionRequest;
+import br.com.ottonsam.toothy_planner_api.ai_usage.usecases.DeepSeekChatCompletionUseCase;
 import br.com.ottonsam.toothy_planner_api.config.ApiException;
 import br.com.ottonsam.toothy_planner_api.flashcards.entities.FlashcardDeckType;
 import br.com.ottonsam.toothy_planner_api.flashcards.entities.FlashcardExampleData;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
-import java.net.SocketTimeoutException;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import okhttp3.MediaType;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.RequestBody;
-import org.springframework.beans.factory.annotation.Value;
+import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
 @Component
 public class DeepSeekFlashcardGenerationAiClient implements FlashcardGenerationAiClient {
 
-    private static final MediaType JSON = MediaType.get("application/json");
+    private static final int MAX_OUTPUT_TOKENS = 8192;
 
-    private final OkHttpClient httpClient;
     private final ObjectMapper objectMapper;
-    private final String apiKey;
-    private final String baseUrl;
-    private final String model;
-    private final long timeoutSeconds;
+    private final DeepSeekChatCompletionUseCase chatCompletionUseCase;
 
     public DeepSeekFlashcardGenerationAiClient(
-            ObjectMapper objectMapper,
-            @Value("${deepseek.api-key:}") String apiKey,
-            @Value("${deepseek.base-url:https://api.deepseek.com}") String baseUrl,
-            @Value("${deepseek.model:deepseek-chat}") String model,
-            @Value("${deepseek.timeout-seconds:60}") long timeoutSeconds) {
-        this.timeoutSeconds = Math.max(1, timeoutSeconds);
-        this.httpClient = new OkHttpClient.Builder()
-                .connectTimeout(Duration.ofSeconds(10))
-                .writeTimeout(Duration.ofSeconds(10))
-                .readTimeout(Duration.ofSeconds(this.timeoutSeconds))
-                .callTimeout(Duration.ofSeconds(this.timeoutSeconds + 15))
-                .build();
+            ObjectMapper objectMapper, DeepSeekChatCompletionUseCase chatCompletionUseCase) {
         this.objectMapper = objectMapper.copy();
-        this.apiKey = apiKey;
-        this.baseUrl = baseUrl;
-        this.model = model;
+        this.chatCompletionUseCase = chatCompletionUseCase;
     }
 
     @Override
-    public FlashcardGenerationAiResult generate(FlashcardGenerationAiRequest request) {
-        if (apiKey == null || apiKey.isBlank()) {
-            throw new ApiException(HttpStatus.BAD_GATEWAY, "DeepSeek API key is not configured");
-        }
+    public FlashcardGenerationAiResult generate(UUID userId, FlashcardGenerationAiRequest request) {
         try {
-            var body = objectMapper.writeValueAsString(Map.of(
-                    "model",
-                    model,
-                    "messages",
+            var response = chatCompletionUseCase.execute(new DeepSeekChatCompletionRequest(
+                    userId,
+                    AiFeature.FLASHCARD_GENERATION,
                     List.of(
                             Map.of("role", "system", "content", systemPrompt()),
                             Map.of("role", "user", "content", userPrompt(request))),
-                    "temperature",
-                    0.2));
-            var httpRequest = new Request.Builder()
-                    .url(baseUrl + "/chat/completions")
-                    .header("Authorization", "Bearer " + apiKey)
-                    .header("Content-Type", "application/json")
-                    .post(RequestBody.create(body, JSON))
-                    .build();
-            try (var response = httpClient.newCall(httpRequest).execute()) {
-                var responseBody = response.body().string();
-                if (!response.isSuccessful()) {
-                    throw new ApiException(HttpStatus.BAD_GATEWAY, errorMessage(response.code(), responseBody));
-                }
-                return parseContent(request.type(), extractContent(objectMapper.readTree(responseBody)));
-            }
-        } catch (SocketTimeoutException exception) {
-            throw new ApiException(HttpStatus.BAD_GATEWAY, "DeepSeek flashcard generation timed out");
+                    0.2,
+                    MAX_OUTPUT_TOKENS,
+                    "DeepSeek flashcard generation failed",
+                    "DeepSeek flashcard generation timed out"));
+            return parseContent(request.type(), extractContent(response));
         } catch (IOException exception) {
             throw new ApiException(
                     HttpStatus.BAD_GATEWAY,
@@ -127,29 +91,6 @@ public class DeepSeekFlashcardGenerationAiClient implements FlashcardGenerationA
                 request.requestedCount(),
                 "alreadyGeneratedTerms",
                 request.alreadyGeneratedTerms()));
-    }
-
-    private String errorMessage(int statusCode, String responseBody) {
-        if (statusCode == 401 || statusCode == 403) {
-            return "DeepSeek authentication failed";
-        }
-        var deepSeekMessage = deepSeekMessage(responseBody);
-        if (deepSeekMessage == null || deepSeekMessage.isBlank()) {
-            return "DeepSeek flashcard generation failed";
-        }
-        return "DeepSeek flashcard generation failed: " + deepSeekMessage;
-    }
-
-    private String deepSeekMessage(String responseBody) {
-        try {
-            return objectMapper
-                    .readTree(responseBody)
-                    .path("error")
-                    .path("message")
-                    .asText();
-        } catch (IOException exception) {
-            return "";
-        }
     }
 
     private String extractContent(JsonNode response) {

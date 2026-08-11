@@ -12,8 +12,7 @@ import org.junit.jupiter.api.Test;
 
 class DeepSeekExpenseTextAiClientTests {
 
-    private final DeepSeekExpenseTextAiClient client =
-            new DeepSeekExpenseTextAiClient(new ObjectMapper(), "test-key", "http://localhost", "test-model", 5);
+    private final DeepSeekExpenseTextAiClient client = new DeepSeekExpenseTextAiClient(new ObjectMapper(), null);
 
     @Test
     void parsesMultipleNormalizedExpensesInOrder() {
