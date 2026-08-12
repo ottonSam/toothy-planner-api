@@ -17,6 +17,8 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.HashSet;
+import java.util.List;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -124,6 +126,25 @@ public class ActivityEntity {
     public static void validateGoal(int goal) {
         if (goal <= 0) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Activity goal must be positive");
+        }
+    }
+
+    public static void validateReplicationWeeks(int activityWeek, int calendarWeeks, List<Integer> weeks) {
+        var uniqueWeeks = new HashSet<Integer>();
+        for (var week : weeks) {
+            if (week == null) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "Replication week is required");
+            }
+            if (!uniqueWeeks.add(week)) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "Replication weeks must not contain duplicates");
+            }
+            if (week <= activityWeek) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "Replication weeks must be greater than activity week");
+            }
+            if (week > calendarWeeks) {
+                throw new ApiException(
+                        HttpStatus.BAD_REQUEST, "Replication week must be less than or equal to calendar weeks");
+            }
         }
     }
 

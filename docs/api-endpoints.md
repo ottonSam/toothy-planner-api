@@ -162,6 +162,26 @@ Exemplos comuns:
 
 Para atividades `TIME`, `goal` e `progress` sao retornados em minutos.
 
+### ActivityCreationResponse
+
+```json
+{
+  "activity": {
+    "id": "70356d1a-d81b-4251-992b-c2897db69652",
+    "calendarId": "70356d1a-d81b-4251-992b-c2897db69652",
+    "description": "Study sessions",
+    "week": 2,
+    "type": "DAYS",
+    "goal": 3,
+    "weekStartsAt": "2026-06-16",
+    "weekEndsAt": "2026-06-22",
+    "progress": 0,
+    "progressDays": []
+  },
+  "replicas": []
+}
+```
+
 ### WeeklyPerformanceReportResponse
 
 ```json
@@ -768,6 +788,20 @@ Request para atividade por tempo:
 }
 ```
 
+Para criar clones independentes em semanas futuras, informe as semanas
+selecionadas em `replicateToWeeks`:
+
+```json
+{
+  "calendarId": "70356d1a-d81b-4251-992b-c2897db69652",
+  "description": "Estudar ingles",
+  "week": 2,
+  "type": "TIME",
+  "goal": "3h 20m",
+  "replicateToWeeks": [3, 4, 6]
+}
+```
+
 Regras principais:
 
 - `calendarId`: obrigatorio; calendario deve pertencer ao usuario autenticado.
@@ -777,8 +811,15 @@ Regras principais:
 - `goal`: string obrigatoria.
 - Para `DAYS` e `COUNT`, `goal` deve ser inteiro positivo em string.
 - Para `TIME`, `goal` deve usar horas/minutos, como `3h 20m`, `45m` ou `2h`.
+- `replicateToWeeks`: opcional; nao pode conter semanas repetidas e todas as
+  semanas devem ser posteriores a `week` e estar dentro do calendario.
+- Original e replicas sao criadas na mesma transacao, com IDs proprios e
+  progresso zerado.
+- Depois da criacao, editar, excluir ou registrar progresso em uma atividade
+  nao altera as demais.
 
-Resposta `201 Created`: `ActivityResponse`.
+Resposta `201 Created`: `ActivityCreationResponse`, contendo `activity` e a
+lista `replicas`. Sem `replicateToWeeks`, `replicas` e uma lista vazia.
 
 Erros comuns:
 
@@ -786,6 +827,9 @@ Erros comuns:
 - `400`: `Activity week is required`.
 - `400`: `Activity goal must be an integer`.
 - `400`: `Time must use hours and minutes, for example 3h 20m`.
+- `400`: `Replication weeks must be greater than activity week`.
+- `400`: `Replication weeks must not contain duplicates`.
+- `400`: `Replication week must be less than or equal to calendar weeks`.
 - `404`: `Calendar not found`.
 
 ### GET /api/v1/activities
@@ -1137,7 +1181,7 @@ Erros comuns:
 | PUT | `/api/v1/calendars/{id}` | Cookie `access_token` | `200 CalendarResponse` |
 | DELETE | `/api/v1/calendars/{id}` | Cookie `access_token` | `204 sem body` |
 | GET | `/api/v1/calendars/{calendarId}/weeks/{week}/activities` | Cookie `access_token` | `200 ActivityResponse[]` |
-| POST | `/api/v1/activities` | Cookie `access_token` | `201 ActivityResponse` |
+| POST | `/api/v1/activities` | Cookie `access_token` | `201 ActivityCreationResponse` |
 | GET | `/api/v1/activities` | Cookie `access_token` | `200 ActivityResponse[]` |
 | GET | `/api/v1/activities/{id}` | Cookie `access_token` | `200 ActivityResponse` |
 | PUT | `/api/v1/activities/{id}` | Cookie `access_token` | `200 ActivityResponse` |

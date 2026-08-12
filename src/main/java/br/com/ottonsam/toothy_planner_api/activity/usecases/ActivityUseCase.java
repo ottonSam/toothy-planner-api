@@ -1,5 +1,7 @@
 package br.com.ottonsam.toothy_planner_api.activity.usecases;
 
+import br.com.ottonsam.toothy_planner_api.activity.dtos.ActivityCreationRequest;
+import br.com.ottonsam.toothy_planner_api.activity.dtos.ActivityCreationResponse;
 import br.com.ottonsam.toothy_planner_api.activity.dtos.ActivityRequest;
 import br.com.ottonsam.toothy_planner_api.activity.dtos.ActivityResponse;
 import br.com.ottonsam.toothy_planner_api.activity.entities.ActivityEntity;
@@ -9,6 +11,7 @@ import br.com.ottonsam.toothy_planner_api.auth.usecases.CurrentUserProvider;
 import br.com.ottonsam.toothy_planner_api.calendar.entities.CalendarEntity;
 import br.com.ottonsam.toothy_planner_api.calendar.repositories.CalendarRepository;
 import br.com.ottonsam.toothy_planner_api.config.ApiException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -38,13 +41,26 @@ public class ActivityUseCase {
         this.activityProgressReader = activityProgressReader;
     }
 
-    public ActivityResponse create(ActivityRequest request) {
+    public ActivityCreationResponse create(ActivityCreationRequest request) {
         var user = currentUserProvider.get();
         var calendar = findOwnedCalendar(request.calendarId(), user.getId());
         var goal = parseGoal(request.type(), request.goal());
-        var activity = ActivityEntity.create(
-                request.description(), requiredWeek(request.week()), calendar, request.type(), goal);
-        return activityProgressReader.toResponse(activityRepository.save(activity));
+        var activityWeek = requiredWeek(request.week());
+        var activity = ActivityEntity.create(request.description(), activityWeek, calendar, request.type(), goal);
+        var replicationWeeks = request.replicateToWeeks() == null ? List.<Integer>of() : request.replicateToWeeks();
+        ActivityEntity.validateReplicationWeeks(activityWeek, calendar.getWeeks(), replicationWeeks);
+
+        var replicas = replicationWeeks.stream()
+                .map(week -> ActivityEntity.create(request.description(), week, calendar, request.type(), goal))
+                .toList();
+        var activities = new ArrayList<ActivityEntity>();
+        activities.add(activity);
+        activities.addAll(replicas);
+        activityRepository.saveAll(activities);
+
+        return new ActivityCreationResponse(
+                activityProgressReader.toResponse(activity),
+                replicas.stream().map(activityProgressReader::toResponse).toList());
     }
 
     public List<ActivityResponse> list() {

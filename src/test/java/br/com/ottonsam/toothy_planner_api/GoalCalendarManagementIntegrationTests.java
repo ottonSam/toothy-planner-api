@@ -248,6 +248,140 @@ class GoalCalendarManagementIntegrationTests {
     }
 
     @Test
+    void createsActivityReplicasAsIndependentActivities() throws Exception {
+        var userCookie = login("activity-replication@example.com");
+        var calendarId = createCalendar(userCookie, "Replication calendar", 6);
+
+        var response = mockMvc.perform(post("/api/v1/activities")
+                        .cookie(userCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "calendarId",
+                                calendarId,
+                                "description",
+                                "Read every week",
+                                "week",
+                                2,
+                                "type",
+                                "COUNT",
+                                "goal",
+                                "20",
+                                "replicateToWeeks",
+                                java.util.List.of(3, 4, 6)))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.activity.week").value(2))
+                .andExpect(jsonPath("$.activity.weekStartsAt").value("2026-01-08"))
+                .andExpect(jsonPath("$.activity.weekEndsAt").value("2026-01-14"))
+                .andExpect(jsonPath("$.activity.progress").value(0))
+                .andExpect(jsonPath("$.replicas.length()").value(3))
+                .andExpect(jsonPath("$.replicas[0].week").value(3))
+                .andExpect(jsonPath("$.replicas[0].weekStartsAt").value("2026-01-15"))
+                .andExpect(jsonPath("$.replicas[0].weekEndsAt").value("2026-01-21"))
+                .andExpect(jsonPath("$.replicas[0].progress").value(0))
+                .andExpect(jsonPath("$.replicas[1].week").value(4))
+                .andExpect(jsonPath("$.replicas[2].week").value(6))
+                .andReturn()
+                .getResponse();
+
+        var body = objectMapper.readTree(response.getContentAsString());
+        var activityId = UUID.fromString(body.get("activity").get("id").asText());
+        var firstReplicaId =
+                UUID.fromString(body.get("replicas").get(0).get("id").asText());
+        var secondReplicaId =
+                UUID.fromString(body.get("replicas").get(1).get("id").asText());
+        var thirdReplicaId =
+                UUID.fromString(body.get("replicas").get(2).get("id").asText());
+
+        assertThat(java.util.Set.of(activityId, firstReplicaId, secondReplicaId, thirdReplicaId))
+                .hasSize(4);
+
+        mockMvc.perform(post("/api/v1/activities/progress/count")
+                        .cookie(userCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("activityId", firstReplicaId, "value", 5))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.progress").value(5));
+
+        mockMvc.perform(put("/api/v1/activities/{id}", firstReplicaId)
+                        .cookie(userCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "calendarId",
+                                calendarId,
+                                "description",
+                                "Changed replica",
+                                "week",
+                                3,
+                                "type",
+                                "COUNT",
+                                "goal",
+                                "20"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.description").value("Changed replica"));
+
+        mockMvc.perform(delete("/api/v1/activities/{id}", secondReplicaId).cookie(userCookie))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/v1/activities/{id}", activityId).cookie(userCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.description").value("Read every week"))
+                .andExpect(jsonPath("$.progress").value(0));
+        mockMvc.perform(get("/api/v1/activities/{id}", secondReplicaId).cookie(userCookie))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/v1/activities/{id}", thirdReplicaId).cookie(userCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.description").value("Read every week"))
+                .andExpect(jsonPath("$.progress").value(0));
+    }
+
+    @Test
+    void rejectsInvalidActivityReplicationAndRollsBackCreation() throws Exception {
+        var userCookie = login("invalid-replication@example.com");
+        var otherCookie = login("replication-owner@example.com");
+        var calendarId = createCalendar(userCookie, "Validation calendar", 6);
+        var otherCalendarId = createCalendar(otherCookie, "Private calendar", 6);
+
+        assertReplicationError(
+                userCookie,
+                calendarId,
+                java.util.List.of(2, 3),
+                "Replication weeks must be greater than activity week");
+        assertReplicationError(
+                userCookie, calendarId, java.util.List.of(3, 3), "Replication weeks must not contain duplicates");
+        assertReplicationError(
+                userCookie,
+                calendarId,
+                java.util.List.of(3, 7),
+                "Replication week must be less than or equal to calendar weeks");
+
+        mockMvc.perform(post("/api/v1/activities")
+                        .cookie(userCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "calendarId",
+                                otherCalendarId,
+                                "description",
+                                "Unauthorized replication",
+                                "week",
+                                2,
+                                "type",
+                                "COUNT",
+                                "goal",
+                                "20",
+                                "replicateToWeeks",
+                                java.util.List.of(3)))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Calendar not found"));
+
+        mockMvc.perform(get("/api/v1/activities").cookie(userCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isEmpty());
+        mockMvc.perform(get("/api/v1/activities").cookie(otherCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isEmpty());
+    }
+
+    @Test
     void registersActivityProgress() throws Exception {
         var userCookie = login("progress-user@example.com");
         var calendarId = createCalendar(userCookie, "Progress calendar", 4);
@@ -457,9 +591,34 @@ class GoalCalendarManagementIntegrationTests {
                                 "type", type,
                                 "goal", goal))))
                 .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.replicas").isEmpty())
                 .andReturn()
                 .getResponse();
-        return readId(response.getContentAsString());
+        JsonNode jsonNode = objectMapper.readTree(response.getContentAsString());
+        return UUID.fromString(jsonNode.get("activity").get("id").asText());
+    }
+
+    private void assertReplicationError(
+            Cookie accessToken, UUID calendarId, java.util.List<Integer> replicationWeeks, String message)
+            throws Exception {
+        mockMvc.perform(post("/api/v1/activities")
+                        .cookie(accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "calendarId",
+                                calendarId,
+                                "description",
+                                "Invalid replication",
+                                "week",
+                                2,
+                                "type",
+                                "COUNT",
+                                "goal",
+                                "20",
+                                "replicateToWeeks",
+                                replicationWeeks))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(message));
     }
 
     private Cookie login(String email) throws Exception {

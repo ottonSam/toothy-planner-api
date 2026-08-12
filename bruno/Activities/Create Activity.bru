@@ -16,7 +16,8 @@ body:json {
     "description": "Study sessions",
     "week": 2,
     "type": "DAYS",
-    "goal": "3"
+    "goal": "3",
+    "replicateToWeeks": [3, 4, 6]
   }
 }
 
@@ -27,5 +28,6 @@ vars:pre-request {
 docs {
   Requires authenticated access_token cookie.
   For TIME activities, goal must be text like 3h 20m, 2m 4h, 45m or 2h.
-  Expected response: 201 Created with goal converted to minutes and progress as 0.
+  replicateToWeeks is optional and creates independent activities in future calendar weeks.
+  Expected response: 201 Created with activity and replicas; all start with progress 0.
 }

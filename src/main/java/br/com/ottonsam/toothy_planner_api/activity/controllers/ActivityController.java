@@ -1,5 +1,7 @@
 package br.com.ottonsam.toothy_planner_api.activity.controllers;
 
+import br.com.ottonsam.toothy_planner_api.activity.dtos.ActivityCreationRequest;
+import br.com.ottonsam.toothy_planner_api.activity.dtos.ActivityCreationResponse;
 import br.com.ottonsam.toothy_planner_api.activity.dtos.ActivityProgressCountRequest;
 import br.com.ottonsam.toothy_planner_api.activity.dtos.ActivityProgressDayRequest;
 import br.com.ottonsam.toothy_planner_api.activity.dtos.ActivityProgressTimeRequest;
@@ -37,7 +39,7 @@ public class ActivityController {
     }
 
     @PostMapping
-    ResponseEntity<ActivityResponse> create(@RequestBody ActivityRequest request) {
+    ResponseEntity<ActivityCreationResponse> create(@RequestBody ActivityCreationRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(activityUseCase.create(request));
     }
 
